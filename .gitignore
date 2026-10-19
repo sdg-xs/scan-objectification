@@ -1,0 +1,16 @@
+# Existing reference material and local secrets are outside the web app repository.
+/Source Code/
+/hugtoken.txt
+/*.exe
+/*.pdf
+
+# Local build/runtime files.
+node_modules/
+.venv/
+.venv-*/
+__pycache__/
+.pytest_cache/
+dist/
+build/
+.env
+.env.*
