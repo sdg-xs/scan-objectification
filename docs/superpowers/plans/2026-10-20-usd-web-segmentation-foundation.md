@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - Run the browser, API, worker, storage, OpenUSD, and Spark conversion on the same NVIDIA GPU PC. Bind to `127.0.0.1` by default.
+- The API uses port `8767`. Port `8766` belongs to the existing SAM3 mask service, which must keep running on the same PC; the two services must never contend for a port.
 - One project has one immutable source revision. A different source requires a new project.
 - The source identity is exactly `(sourceRevisionId, sourcePrimPath, sourceIndex)`. `sourceIndex` is an unsigned 64-bit index into the immutable USD `positions` array.
 - Never use Spark LoD nodes or PLY row positions as authoritative edit IDs.
@@ -30,7 +31,22 @@
 - ZIP and USD dependency checks cannot escape the staged project directory, including Windows case folding and junction/symlink behavior.
 - A crash cannot publish partial media, duplicate an ingest job, or destroy a previously successful publication.
 - Coordinate, scale, opacity, color, and quaternion conversion are proven with anisotropic test fixtures before a real scene is accepted.
-- The 50-million-splat acceptance run reports peak memory, elapsed time, disk amplification, initial view time, detail settling, and browser frame time instead of asserting an unmeasured performance target.
+- The representative-scene acceptance run reports peak memory, elapsed time, disk amplification, initial view time, detail settling, and browser frame time instead of asserting an unmeasured performance target. The measured baseline for the 6,366,784-splat scene is recorded in Task 7 Step 6.
+
+## Host Prerequisites (verified 2026-10-21)
+
+These are properties of the development host, not design decisions. Verify each on the target GPU PC before the acceptance gates.
+
+| Prerequisite | Required | Status on development host |
+|---|---|---|
+| Python | `>=3.12,<3.13` | **Missing.** Only Python 3.14.6 is installed; install 3.12 before creating the virtual environment. |
+| Node.js | `^20.19.0 \|\| >=22.12.0` (Vite 8) and `^22.12.0 \|\| ^24.0.0 \|\| >=26.0.0` (Vitest 5) | Present (v24.16.0, satisfies both), but `npm` resolves to `npm.ps1` and is blocked by the PowerShell execution policy. Run `npm.cmd` (e.g. `npm.cmd test -- --run`). |
+| `pxr` (OpenUSD) | `usd-core==26.8` | Present and matching the pin. |
+| Rust toolchain | `cargo` + `rustc` | **Missing.** `build-lod` must be built from source. |
+| NVIDIA GPU | CUDA-capable | **Missing.** The host has only Intel graphics. SAM3 cannot run here; GPU work is a target-PC step. |
+| Free disk | >= 3x the largest source scene | ~558 GiB free on `C:`. |
+
+The `@sparkjsdev/spark@2.3.1` npm package ships only `dist/`; it contains no `build-lod` executable and no `rust/` source. Its `build-lod` script is `cargo run --manifest-path rust/build-lod/Cargo.toml --release --`, so the binary must be built from a source checkout of the `v2.3.1` tag. The GitHub release `v2.3.1` publishes **zero** assets, so there is no prebuilt binary to download.
 
 ---
 
@@ -96,7 +112,7 @@ Do not add a general repository layer, service classes, dependency-injection fra
 | Name | Pilot default | Purpose |
 |---|---:|---|
 | `NEMY_BIND` | `127.0.0.1` | API bind address |
-| `NEMY_PORT` | `8766` | API and frontend port |
+| `NEMY_PORT` | `8767` | API and frontend port |
 | `NEMY_DATA_DIR` | `./data` | all mutable state |
 | `NEMY_MAX_UPLOAD_BYTES` | `8589934592` | 8 GiB upload guard, adjustable after benchmark |
 | `NEMY_MAX_EXPANDED_BYTES` | `34359738368` | 32 GiB ZIP expansion guard |
@@ -240,6 +256,8 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
   In `pyproject.toml`, require Python `>=3.12,<3.13`; pin runtime dependencies `fastapi==0.150.0`, `uvicorn[standard]==0.54.0`, `numpy==2.5.4`, and `usd-core==26.8`; pin development dependencies `pytest==9.1.1`, `httpx==0.28.1`, and `pytest-timeout==2.4.0`. Add console scripts `nemy-api = nemy_web.app:main` and `nemy-worker = nemy_web.worker:main`. Configure pytest to use `tests` and a 30-second default timeout.
 
+  Install Python 3.12 and create the virtual environment with it before installing dependencies. The development host currently has only Python 3.14.6, which this pin excludes; wheels for every pinned dependency exist for 3.12, 3.13, and 3.14, so the pin is the only blocker.
+
   In `package.json`, pin `three==0.186.1`, `@sparkjsdev/spark==2.3.1`, `hash-wasm==4.12.0`, `vite==8.3.4`, `typescript==7.0.2`, and `vitest==5.0.5`. Commit `package-lock.json`; it is the exact frontend dependency record. Scripts: `dev`, `build`, `test`, and `typecheck`.
 
 - [ ] **Step 2: Write failing configuration and health tests.**
@@ -272,9 +290,9 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
   ```powershell
   python -m pytest -q
-  npm test -- --run
-  npm run typecheck
-  npm run build
+  npm.cmd test -- --run
+  npm.cmd run typecheck
+  npm.cmd run build
   ```
 
   Expected: all tests pass, TypeScript exits 0, and Vite writes `dist/`.
@@ -285,6 +303,8 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
   git add pyproject.toml package.json package-lock.json tsconfig.json vite.config.ts vitest.config.ts .env.example src tests web
   git commit -m "Bootstrap local USD web pilot"
   ```
+
+  The repository `.gitignore` ends with `.env.*`, which also matches `.env.example`. It carries a `!.env.example` negation so this tracked template is addable, and ignores `/data/` so the SQLite database, `data/server-secret`, uploads, and logs can never be committed.
 
 ## Task 2: Implement Capability Projects and Version Checks
 
@@ -311,7 +331,7 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
   ```powershell
   python -m pytest tests/test_projects.py -q
-  npm test -- --run web/src/api.test.ts
+  npm.cmd test -- --run web/src/api.test.ts
   ```
 
   Expected: failure because project routes and browser client are absent.
@@ -328,7 +348,7 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
 - [ ] **Step 6: Verify and commit.**
 
-  Run all backend and frontend tests plus `npm run typecheck`, then:
+  Run all backend and frontend tests plus `npm.cmd run typecheck`, then:
 
   ```powershell
   git add src/nemy_web tests web/src
@@ -351,6 +371,8 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 - [ ] **Step 2: Write failing archive safety tests.**
 
   Build ZIP fixtures in memory for a valid local bundle and reject: absolute paths, `..`, drive-letter paths, case-insensitive duplicates, symlink entries, unsupported special entries, too many bytes after expansion, a root stage not present in the bundle, and a root outside the extraction root. On Windows, reject any extracted component that resolves to a reparse point.
+
+  `C:\Users\JoshuaRetuta\Documents\USD FOLDER\SOL10.usd` is a natural real-world bundle fixture because it references four sibling stages under `SubUSDs/`. That `SubUSDs/` directory is **absent** from the pilot machine, so the stage currently opens with unresolved references and cannot be used as-is. Either stage the referenced files into a local bundle fixture or synthesize an equivalent local-reference bundle in the test fixtures; do not depend on files outside the repository.
 
 - [ ] **Step 3: Run the focused test and confirm failure.**
 
@@ -505,7 +527,9 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
   `scripts/install-spark-build-lod.ps1` accepts an explicit install directory, checks out Spark tag `v2.3.1` into a temporary directory, runs Cargo for `rust/build-lod`, copies only the executable, prints its SHA-256, and removes the temporary checkout. Fail with a clear Rust prerequisite message when `cargo` is missing. Never install Rust silently.
 
-  Record the expected Spark tag and the locally observed binary hash in `README.md`; set `NEMY_BUILD_LOD` to that file. The current development PC has no Rust toolchain, so execution of this script is a target-PC prerequisite before the real conversion acceptance run.
+  The checkout must be a full source clone of the `v2.3.1` tag. The `@sparkjsdev/spark@2.3.1` npm package ships only `dist/`: it contains no `build-lod` executable and no `rust/` directory, and its `build-lod` script is `cargo run --manifest-path rust/build-lod/Cargo.toml --release --`. The GitHub release `v2.3.1` publishes zero assets, so there is no prebuilt binary to download. Building from source requires the Rust toolchain plus a C++ linker and the Spark crate's native dependencies.
+
+  Record the expected Spark tag and the locally observed binary hash in `README.md`; set `NEMY_BUILD_LOD` to that file. The current development PC has no Rust toolchain and no NVIDIA GPU, so execution of this script and the real conversion acceptance run are target-PC prerequisites.
 
 - [ ] **Step 6: Verify generated media.**
 
@@ -550,7 +574,7 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
   ```powershell
   python -m pytest tests/test_media.py -q
-  npm test -- --run web/src/viewer.test.ts
+  npm.cmd test -- --run web/src/viewer.test.ts
   ```
 
 - [ ] **Step 5: Implement media sessions and streaming.**
@@ -605,7 +629,7 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
 - [ ] **Step 3: Add the pilot launcher and operating guide.**
 
-  `scripts/run-pilot.ps1` validates Python, Node-built frontend, `pxr`, configured data directory, converter path, free disk space, and loopback bind; then starts the worker and API as hidden child processes and prints `http://127.0.0.1:8766/`. It must preserve logs under `data/logs` with authorization values filtered. Stop both children on script exit.
+  `scripts/run-pilot.ps1` validates Python, Node-built frontend, `pxr`, configured data directory, converter path, free disk space, and loopback bind; then starts the worker and API as hidden child processes and prints `http://127.0.0.1:8767/`. It must preserve logs under `data/logs` with authorization values filtered. Stop both children on script exit.
 
   `README.md` must contain exact setup, converter prerequisite, environment values, startup, backup statement, source immutability, secret-link warning, recovery, update, and uninstall/delete instructions. State that build 1 does not yet segment or export results.
 
@@ -613,9 +637,9 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
   ```powershell
   python -m pytest -q
-  npm test -- --run
-  npm run typecheck
-  npm run build
+  npm.cmd test -- --run
+  npm.cmd run typecheck
+  npm.cmd run build
   git diff --check
   ```
 
@@ -635,7 +659,7 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
 
 - [ ] **Step 6: Run the representative large-scene gate.**
 
-  Select a self-contained static scene above 50 million splats. Record in a dated `docs/benchmarks/<date>-<machine>.md`:
+  Use `C:\Users\JoshuaRetuta\Documents\USD FOLDER\SOL10_OUTDOOR_1.usd` as the representative scene: a self-contained static Gaussian scene with **6,366,784 splats**. It is the largest Gaussian scene available on the pilot machine and the only one that exercises the `ParticleField3DGaussianSplat` schema. Record in a dated `docs/benchmarks/<date>-<machine>.md`:
 
   - CPU, RAM, GPU, VRAM, disk type, software versions, and converter hash;
   - input bytes and splat count;
@@ -647,6 +671,31 @@ JSON contains actual arrays, not the illustrative `[16, ...]` notation. Use a de
   - visual parity results for geometry, transform, color, scale, opacity, orientation, and bounds.
 
   The gate passes only when the scene finishes without exhausting the target PC and the browser stays within a documented bounded Spark splat budget. If it fails, keep the product claim limited to the largest measured passing scene and tune only chunk size, `build-lod` flags, quotas, or worker limits before repeating.
+
+  **Measured baseline (development host, 2026-10-21, OpenUSD 26.8).** These are the numbers the gate is compared against.
+
+  | Quantity | Measured |
+  |---|---|
+  | Source file size | 339,618,990 bytes |
+  | Splat count | 6,366,784 |
+  | `positions` | 76,401,408 B (float32 × 3) |
+  | `scales` | 76,401,408 B (float32 × 3) |
+  | `orientations` | 101,868,544 B (float32 × 4) |
+  | `opacities` | 25,467,136 B (float32) |
+  | `radiance:sphericalHarmonicsCoefficients` | 76,401,408 B (float32 × 3) |
+  | Total source arrays | 356,539,904 B (0.332 GiB) |
+  | Stage open | 0.02 s |
+
+  Two memory figures bound the requirement:
+
+  | Ingest pattern | Peak RSS | Note |
+  |---|---|---|
+  | All five arrays resident at once | 733.0 MB | 2.16x the 356,539,904 B of array data. |
+  | One attribute at a time, freed before the next | 466.0 MB | Matches the Task 4 Step 6 streaming requirement. |
+
+  The streaming path must stay at or below 466 MB for this scene. A run above 600 MB peak RSS means more than one source array is being held at once and has violated the one-attribute-at-a-time rule in Task 4 Step 6.
+
+  **Scaling note.** The original 50-million-splat target was dropped after a search of the pilot machine found no scene above 6,366,784 Gaussian splats. `SOL10 Outdoors.usd` holds 42,352,092 points, but it is a `Points` prim with no `positions`/`scales`/`orientations`/SH arrays and is therefore not a Gaussian scene. Extrapolating the measured 2.16x amplification, a 50-million-splat scene with this array set would need roughly 2.8 GiB of source arrays and about 6.0 GiB peak RSS if all arrays were resident at once. Supporting that scale is a measured-claim decision for the target PC, not a current deliverable.
 
 - [ ] **Step 7: Request code review and address only evidenced blockers.**
 

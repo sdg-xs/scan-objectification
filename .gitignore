@@ -14,3 +14,7 @@ dist/
 build/
 .env
 .env.*
+!.env.example
+
+# Mutable application state: SQLite database, server secret, uploads, logs.
+/data/

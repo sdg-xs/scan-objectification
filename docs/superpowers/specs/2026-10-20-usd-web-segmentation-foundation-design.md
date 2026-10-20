@@ -7,11 +7,11 @@ Status: approved on 2026-10-20
 
 Build a locally hosted web application that lets one pilot user upload an existing USD Gaussian scene, inspect it in a Three.js viewer, capture views, run SAM3 segmentation, refine the resulting objects, edit asset metadata, and save new USD objects and review state. The browser, Python/OpenUSD service, storage, and SAM3 worker run on the same NVIDIA GPU PC. The uploaded source remains unchanged. There is no sign-in in the pilot; an unguessable project link grants read, edit, export, and delete access. Broader network access and multiple users are deferred until the pilot is stable.
 
-The expected input includes multi-gigabyte scenes with more than 50 million splats. This scale rules out downloading all original Gaussian arrays into the browser. The server holds the original USD and authoritative source selections; the browser receives a bounded, streamable render derivative and compact previews.
+The expected input includes multi-gigabyte scenes with millions of splats. This scale rules out downloading all original Gaussian arrays into the browser. The server holds the original USD and authoritative source selections; the browser receives a bounded, streamable render derivative and compact previews.
 
 This is a **three-build program**, not one implementation plan:
 
-1. **Foundation (this spec):** project link and deletion, resumable USD upload, validation, stable source identity, conversion to a streamable render derivative, and a navigable Three.js/Spark viewer. The acceptance tests include a representative scene above 50 million splats.
+1. **Foundation (this spec):** project link and deletion, resumable USD upload, validation, stable source identity, conversion to a streamable render derivative, and a navigable Three.js/Spark viewer. The acceptance tests include the representative scene of 6,366,784 Gaussian splats described in section 10.
 2. **Segmentation and refinement (later spec):** A/B/C captures, GPU SAM3 jobs, mask review, server-side projection and cross-view matching, 3D preview, paint, erase, box, and merge.
 3. **Save and metadata (later spec):** the latest saved USD output, restored review state, asset metadata forms and dropdowns for extracted objects, and a self-contained download.
 
@@ -52,6 +52,8 @@ Use a persistent local job table and one background worker process. Jobs continu
 Creating a project returns an opaque project ID and a high-entropy capability secret. The link is `<app-origin>/p/<project-id>#key=<secret>`; the URL fragment is not sent with normal HTTP requests. The browser sends the secret in an authorization header for project APIs. The server stores a hash of the secret, never the plaintext; logs and telemetry redact authorization headers. Access to *every* project API, job status, upload, export, and deletion endpoint is checked against that capability.
 
 The pilot binds to loopback by default and is opened from a browser on the same GPU PC. HTTPS, a domain, and an IP address are not prerequisites for local use. The capability model remains because it protects project URLs and supports a later hosted rollout. The user can rotate a project's secret; rotation immediately invalidates the old link.
+
+The web application listens on port `8767`. Port `8766` is reserved for the existing local SAM3 mask service, which stays on the same PC and must not be repointed, stopped, or contended with.
 
 Spark's media loader needs normal same-origin Range URLs. After a valid header exchange, the API issues a short-lived, project-scoped, HttpOnly, SameSite=Strict media cookie so the browser can request protected render chunks. The cookie is also `Secure` when the app uses HTTPS. It grants only media reads; state-changing APIs still require the capability header. The cookie is renewed while the link is open and invalidated on project deletion. The response uses private cache controls. No third-party client scripts or analytics receive the fragment.
 
@@ -123,12 +125,14 @@ The first build is accepted when the following pass on the intended hosting hard
 - Rotating the capability secret invalidates the old link. Opening the current link from two tabs and submitting stale state produces a conflict instead of losing the newer change.
 - A bundle with local references resolves correctly. External refs, path traversal, oversized expansion, malformed arrays, and unsupported time samples fail clearly without exposing files or publishing partial media.
 - Interrupt a multi-gigabyte upload, resume it, verify the digest, and complete conversion once. Retries of the same chunk and job request do not duplicate project data.
-- A representative input above 50 million splats completes ingestion within the target server's measured CPU/RAM/disk budget and displays in a bounded browser memory budget. Measure conversion time, disk amplification, Range behavior, initial view time, detail settling, and frame time. Set public performance targets only from these results; no unmeasured FPS promise is part of this design.
+- A representative input of 6,366,784 Gaussian splats (`SOL10_OUTDOOR_1.usd`, the largest Gaussian scene available on the pilot machine) completes ingestion within the target server's measured CPU/RAM/disk budget and displays in a bounded browser memory budget. Measure conversion time, disk amplification, Range behavior, initial view time, detail settling, and frame time. Set public performance targets only from these results; no unmeasured FPS promise is part of this design. Supporting a scene above 50 million splats requires a separately measured run on the target PC and is not claimed by this design.
 - Check a sample of `(sourcePrimPath, sourceIndex)` values against the original USD after conversion. The scene manifest's coordinate matrix round-trips sample points between USD and the viewer within a declared numeric tolerance.
 - Failed or canceled conversion leaves the immutable source and any previously published viewer files intact. Delete Project disables access and purges project files; backup behavior matches the published deployment policy.
 
 ## 11. Deferred decisions and risks
 
 The first real scene benchmark decides converter chunk size, worker memory allocation, render encoding settings, quotas, and performance targets. These are measured deployment values, not product semantics. A single OpenUSD array read may still require substantial server RAM even if browser loading is streamed; the benchmark must expose this before claiming support for a particular scene size. If Spark's `.RAD` path fails a visual parity or scale test, choose another Spark-supported streamable derivative while preserving the source-ID and manifest contracts.
+
+The representative scene was measured on the development host on 2026-10-21 with OpenUSD 26.8: 339,618,990 source bytes, 356,539,904 bytes of source arrays, 733.0 MB peak resident memory when every array is held at once, and 466.0 MB when the arrays are read one at a time and freed before the next. The 466.0 MB figure is the streaming budget the ingest path must respect. A 50-million-splat scene with the same attribute set would need roughly 2.8 GiB of source arrays, so that scale remains an unmeasured claim until a benchmark run on the target PC supports it.
 
 Build 2 will specify exact mask matching, visibility, capture detail thresholds, and 3D refinement mechanics within the approved three-view and 50-instance limits. Build 3 will specify the self-contained USD package layout and field validation within the approved metadata, latest-save, and export behavior. Neither build may use the render LoD tree as the authoritative selection source.
