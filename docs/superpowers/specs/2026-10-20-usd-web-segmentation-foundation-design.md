@@ -1,7 +1,7 @@
 # USD Gaussian Segmentation on the Web: Foundation Design
 
 Date: 2026-10-20  
-Status: revised after design grilling; awaiting review of this written spec
+Status: approved on 2026-10-20
 
 ## 1. Goal and scope
 
