@@ -119,7 +119,28 @@ The session then selected **subagent-driven development** and began execution. T
 
 ## Next action for another AI
 
-Read the approved specification and implementation plan first, including the "Host Prerequisites" table in the plan. Then start at **Task 1, Step 1** of the plan. Continue with the selected subagent-driven workflow, preserving the pilot constraints above. Do not expand to authentication, multi-user collaboration, animation, or revision history unless explicitly requested.
+**Start from the continuation plan, not Task 1.** Tasks 1 and 2 are complete, committed, and
+reviewed clean. The work that remains is Tasks 3 through 7.
+
+1. Read `docs/superpowers/plans/2026-10-22-usd-web-segmentation-continuation.md`. It supersedes
+   the original plan for Tasks 3-7 and carries forward every decision Tasks 1 and 2 established.
+2. Read the SDD ledger at
+   `.superpowers/sdd/2026-10-20-usd-web-segmentation-foundation/progress.md`. It holds the
+   pre-flight scan, every ruling, the per-task log, the deferred-minor list, and the parked
+   findings. **Trust it over any recollection** — it is the only record of what was decided.
+3. Resume at **Task 3** (resumable upload and safe bundle staging). It has not been started:
+   its previous implementer was cancelled before writing any implementation.
+4. Continue with the subagent-driven workflow, preserving the pilot constraints above. Do not
+   expand to authentication, multi-user collaboration, animation, or revision history unless
+   explicitly requested.
+
+### The two things most likely to be got wrong
+
+- **Route registration.** The frontend is `app.router.default`, never a `Mount`. New routers go in
+  `create_pilot_app()` next to `projects.router` — *not* inside `create_app()`. A router included
+  inside `create_app()` breaks Task 1's reviewed tests.
+- **The CSP.** `script-src 'self' 'wasm-unsafe-eval'` is required; both pinned WASM dependencies
+  break without it. This was proven in a real browser against a real production bundle.
 
 ## Corrections applied to the plan and spec (2026-10-21)
 
@@ -133,5 +154,27 @@ The handoff and the committed plan contained defects that were verified against 
 
 ## Session status at handoff
 
-The design was approved and the implementation plan was committed. The immediate next step is Task 1, Step 1 of the plan, after installing Python 3.12.
+**Updated 2026-10-21 (evening).** Tasks 1 and 2 are complete, committed, and reviewed clean.
+
+| Commit | What |
+|---|---|
+| `67871f5` | Correct foundation plan defects found during handoff review |
+| `f328023` | Bootstrap local USD web pilot (Task 1) |
+| `7444a36` | Fix review findings in the Task 1 pilot skeleton (Task 1 fix round 1/5) |
+| `89f2c63` | Add capability-link projects (Task 2) |
+| `2a86931` | Add continuation plan for foundation tasks 3-7 |
+
+Task 1: 22 tests, review clean after one fix round (1 Critical + 3 Important + 4 Minor, all
+addressed and independently re-verified). Task 2: 43 backend + 9 frontend tests, review clean on
+the first pass (spec ✅, quality Approved).
+
+Task 3 is **not started** — its implementer was cancelled before writing any implementation. Only
+`tests/fixtures/make_bundle.py` survives, and it is committed.
+
+The original plan's Task 1 Step 1 is superseded. The authoritative entry point for remaining work
+is `docs/superpowers/plans/2026-10-22-usd-web-segmentation-continuation.md`.
+
+**Blockers requiring the target GPU PC:** no Rust toolchain (so `build-lod` must be built from a
+source checkout of Spark `v2.3.1`) and no NVIDIA GPU. Task 5's real conversion, Task 6's visual
+fixture check, and Task 7's benchmarks are target-PC work; everything else is buildable here.
 
