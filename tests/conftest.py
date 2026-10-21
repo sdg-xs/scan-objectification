@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from nemy_web.app import create_app
+from nemy_web.app import create_pilot_app
 from nemy_web.config import Settings
 
 
@@ -27,5 +27,5 @@ def settings(data_dir: Path) -> Settings:
 @pytest.fixture
 def client(settings: Settings) -> Iterator[TestClient]:
     """A started application, so the lifespan has run."""
-    with TestClient(create_app(settings)) as test_client:
+    with TestClient(create_pilot_app(settings)) as test_client:
         yield test_client

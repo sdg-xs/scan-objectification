@@ -1,7 +1,8 @@
 """FastAPI construction for the local pilot.
 
 The app owns the HTTP API, the SQLite records, and the same-origin static
-frontend. Project routes, uploads, jobs, and media are added by later tasks.
+frontend. The project API is added by `create_pilot_app`; uploads, jobs, and
+media are added by later tasks.
 
 Route ordering: the frontend is installed as the router's *default* handler,
 not as a mounted route. A `Mount` at `/` matches every path, so it would
@@ -24,7 +25,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocketClose
 
-from nemy_web import db
+from nemy_web import db, projects
 from nemy_web.config import Settings
 
 # Same-origin only. `worker-src` allows the blob workers that Spark creates,
@@ -209,6 +210,14 @@ def create_app(settings: Settings | None = None, dist_dir: Path | None = None) -
         }
         return JSONResponse(payload)
 
+    # The project routes are registered by `create_pilot_app`, *after*
+    # `create_app()` returns, not here. Starlette matches routes in
+    # registration order and the first match wins, so registering
+    # `/api/projects` inside `create_app()` would shadow any route a later
+    # task registers for the same path, and would make a bare `create_app()`
+    # answer `POST /api/projects` instead of leaving it to the frontend
+    # fallback's 404. Both are the behaviour Task 1 pinned.
+
     # The frontend is the router's *default* handler, not a mounted route.
     # A `Mount` at "/" matches every path and would shadow any route a later
     # task registers after `create_app()` returns. The default handler runs
@@ -237,12 +246,34 @@ def create_app(settings: Settings | None = None, dist_dir: Path | None = None) -
     return app
 
 
+def create_pilot_app(
+    settings: Settings | None = None, dist_dir: Path | None = None
+) -> FastAPI:
+    """Build the pilot application with the project API attached.
+
+    `create_app()` deliberately knows nothing about the project API. It
+    installs the frontend as the router's default handler, and Task 1 pinned
+    two facts about that arrangement: a bare `create_app()` answers
+    `POST /api/projects` with the fallback's 404, and a route registered
+    *after* `create_app()` returns still wins for that path.
+
+    Starlette matches routes in registration order, so the project router
+    cannot be included from inside `create_app()`: it would be matched
+    before any later route and would take the path away from it. It is
+    included here, after `create_app()` has returned, which keeps both
+    properties intact and still leaves the frontend as the default handler.
+    """
+    app = create_app(settings, dist_dir)
+    app.include_router(projects.router)
+    return app
+
+
 def main() -> None:
     """Console-script entry point for the API."""
     import uvicorn
 
     settings = Settings.from_env()
-    uvicorn.run(create_app(settings), host=settings.bind, port=settings.port)
+    uvicorn.run(create_pilot_app(settings), host=settings.bind, port=settings.port)
 
 
 if __name__ == "__main__":
