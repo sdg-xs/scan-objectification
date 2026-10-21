@@ -2,6 +2,12 @@
 
 The app owns the HTTP API, the SQLite records, and the same-origin static
 frontend. Project routes, uploads, jobs, and media are added by later tasks.
+
+Route ordering: the frontend is installed as the router's *default* handler,
+not as a mounted route. A `Mount` at `/` matches every path, so it would
+shadow any route a later task registers after `create_app()` returns. The
+default handler is consulted only after every registered route has failed to
+match, so routes added later stay reachable.
 """
 
 from __future__ import annotations
@@ -16,19 +22,25 @@ from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.websockets import WebSocketClose
 
 from nemy_web import db
 from nemy_web.config import Settings
 
 # Same-origin only. `worker-src` allows the blob workers that Spark creates,
 # and `img-src` allows the blob textures the viewer generates.
+#
+# `'wasm-unsafe-eval'` permits WebAssembly compilation, which both pinned
+# WASM dependencies need: Spark compiles its Rust module at import time and
+# hash-wasm compiles its SHA-256 kernel. It does not permit `eval()` or
+# `new Function()`, and neither dependency uses them.
 CONTENT_SECURITY_POLICY = "; ".join(
     (
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
         "frame-ancestors 'none'",
-        "script-src 'self'",
+        "script-src 'self' 'wasm-unsafe-eval'",
         "style-src 'self'",
         "img-src 'self' data: blob:",
         "font-src 'self'",
@@ -70,7 +82,11 @@ class SpaStaticFiles(StaticFiles):
 
     The capability link is `/p/<project-id>#key=<secret>`. The fragment never
     reaches the server, so the server must answer `/p/<project-id>` with the
-    application shell.
+    application shell rather than a 404.
+
+    The fallback is restricted to navigational requests. A missing asset must
+    stay a 404: serving the HTML shell for a missing `.js` file would hand the
+    browser an HTML document it cannot execute.
     """
 
     async def check_config(self) -> None:
@@ -89,7 +105,7 @@ class SpaStaticFiles(StaticFiles):
         except HTTPException as error:
             if error.status_code != 404:
                 raise
-            if scope["path"].startswith(("/api", "/media")):
+            if not self._is_app_route(scope):
                 raise
             try:
                 return await super().get_response("index.html", scope)
@@ -98,21 +114,33 @@ class SpaStaticFiles(StaticFiles):
                 # serve. A 404 is the honest answer.
                 raise error
 
+    @staticmethod
+    def _is_app_route(scope: Scope) -> bool:
+        """Whether a request is a client-side navigation the shell answers.
+
+        App routes are the capability links (`/p/<project-id>`) and the root.
+        API and media paths are excluded so a missing API route stays a 404.
+        """
+        path = scope["path"]
+        if path.startswith(("/api", "/media")):
+            return False
+        # A request that names a file extension is an asset request, not a
+        # navigation. Only the app's own routes lack an extension.
+        last_segment = path.rsplit("/", 1)[-1]
+        return "." not in last_segment
+
 
 def default_dist_dir() -> Path:
     """Locate the built frontend directory.
 
-    The build output lives in the repository-root `dist/`. The directory may
-    not exist yet: the API must start and serve the API whether or not the
-    frontend has been built.
+    The build output always lives in the repository-root `dist/`: `vite.config.ts`
+    writes it there. The directory may not exist yet — the API must start and
+    serve the API whether or not the frontend has been built.
+
+    Only the repository root is consulted. A `dist/` in the current working
+    directory is not a build output of this project and must never be served.
     """
-    repo_dist = Path(__file__).resolve().parents[2] / "dist"
-    cwd_dist = Path.cwd() / "dist"
-    if (repo_dist / "index.html").is_file():
-        return repo_dist
-    if (cwd_dist / "index.html").is_file():
-        return cwd_dist
-    return repo_dist
+    return Path(__file__).resolve().parents[2] / "dist"
 
 
 def converter_state(settings: Settings) -> str:
@@ -181,17 +209,30 @@ def create_app(settings: Settings | None = None, dist_dir: Path | None = None) -
         }
         return JSONResponse(payload)
 
-    # Mounted last so the API routes above win. The directory is optional:
-    # the app starts and serves the API before the frontend is built.
-    app.mount(
-        "/",
-        SpaStaticFiles(
-            directory=dist_dir if dist_dir is not None else default_dist_dir(),
-            html=True,
-            check_dir=False,
-        ),
-        name="frontend",
+    # The frontend is the router's *default* handler, not a mounted route.
+    # A `Mount` at "/" matches every path and would shadow any route a later
+    # task registers after `create_app()` returns. The default handler runs
+    # only after every registered route has failed to match, so later routes
+    # stay reachable.
+    frontend = SpaStaticFiles(
+        directory=dist_dir if dist_dir is not None else default_dist_dir(),
+        html=True,
+        check_dir=False,
     )
+
+    async def serve_frontend(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "websocket":
+            # No websocket route matched. Close the socket the way Starlette's
+            # own not-found handler does.
+            await WebSocketClose()(scope, receive, send)
+            return
+        # Only the browser's navigational GET and HEAD requests reach the
+        # frontend. Anything else is an unrouted API call and is a 404.
+        if scope["method"] not in ("GET", "HEAD"):
+            raise HTTPException(status_code=404)
+        await frontend(scope, receive, send)
+
+    app.router.default = serve_frontend
 
     return app
 

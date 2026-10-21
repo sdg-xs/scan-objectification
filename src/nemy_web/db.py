@@ -83,7 +83,12 @@ def transaction(db_path: Path) -> Iterator[sqlite3.Connection]:
         yield connection
         connection.execute("COMMIT")
     except BaseException:
-        connection.execute("ROLLBACK")
+        # Only roll back a transaction that actually began. If `BEGIN
+        # IMMEDIATE` itself failed (for example because the database is
+        # locked), an unconditional ROLLBACK raises "cannot rollback - no
+        # transaction is active" and hides the real cause.
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
         raise
     finally:
         connection.close()

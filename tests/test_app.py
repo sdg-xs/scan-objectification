@@ -8,11 +8,31 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from nemy_web import db
 from nemy_web.app import create_app
 from nemy_web.config import Settings
 
 EXPECTED_HEALTH_BODY = '{"status":"ok","database":"ok","converter":"missing"}'
 EXPECTED_HEALTH = {"status": "ok", "database": "ok", "converter": "missing"}
+
+# The exact policy the app must send. It is asserted as a whole string so a
+# change that breaks the browser is a test failure, not a silent regression.
+#
+# `'wasm-unsafe-eval'` is required: Spark compiles its Rust module at import
+# time and hash-wasm compiles its SHA-256 kernel. Without it both pinned WASM
+# dependencies fail. It permits WASM compilation only, not `eval()`.
+EXPECTED_CSP = (
+    "default-src 'self'; "
+    "base-uri 'self'; "
+    "object-src 'none'; "
+    "frame-ancestors 'none'; "
+    "script-src 'self' 'wasm-unsafe-eval'; "
+    "style-src 'self'; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "worker-src 'self' blob:"
+)
 
 LIMIT_FIELDS = (
     "max_upload_bytes",
@@ -88,13 +108,22 @@ def test_the_data_directory_is_resolved_to_an_absolute_path(data_dir: Path) -> N
 
 def test_responses_carry_the_security_headers(client: TestClient) -> None:
     response = client.get("/api/health")
-    policy = response.headers["Content-Security-Policy"]
 
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["Referrer-Policy"] == "no-referrer"
-    assert "default-src 'self'" in policy
-    assert "worker-src 'self' blob:" in policy
+    assert response.headers["Content-Security-Policy"] == EXPECTED_CSP
+    assert "'wasm-unsafe-eval'" in response.headers["Content-Security-Policy"]
     assert "Access-Control-Allow-Origin" not in response.headers
+
+
+def test_the_policy_allows_wasm_compilation_but_not_eval(client: TestClient) -> None:
+    """The pinned WASM dependencies must be able to compile their modules."""
+    policy = client.get("/api/health").headers["Content-Security-Policy"]
+
+    assert "script-src 'self' 'wasm-unsafe-eval'" in policy
+    # 'unsafe-eval' would also allow eval(); it must not be present.
+    assert "'unsafe-eval'" not in policy
+    assert "script-src 'self' 'unsafe-eval'" not in policy
 
 
 def test_the_api_serves_requests_before_the_frontend_is_built(
@@ -130,3 +159,113 @@ def test_the_frontend_shell_is_served_for_capability_links(tmp_path: Path) -> No
     assert capability_link.status_code == 200
     assert "pilot" in capability_link.text
     assert api_route.status_code == 404
+
+
+def test_a_missing_asset_is_a_404_and_not_the_shell(tmp_path: Path) -> None:
+    """A missing file must not be answered with the HTML shell."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<!doctype html><title>pilot</title>", encoding="utf-8")
+
+    with TestClient(create_app(Settings(data_dir=tmp_path / "data"), dist_dir=dist)) as test_client:
+        missing_asset = test_client.get("/assets/missing-xyz.js")
+        favicon = test_client.get("/favicon.ico")
+
+    assert missing_asset.status_code == 404
+    assert "text/html" not in missing_asset.headers.get("content-type", "")
+    assert favicon.status_code == 404
+    assert "text/html" not in favicon.headers.get("content-type", "")
+
+
+def test_a_real_asset_is_served_with_its_own_content_type(tmp_path: Path) -> None:
+    """The asset path must keep working after the fallback is restricted."""
+    dist = tmp_path / "dist"
+    assets = dist / "assets"
+    assets.mkdir(parents=True)
+    (dist / "index.html").write_text("<!doctype html><title>pilot</title>", encoding="utf-8")
+    (assets / "index-abc.js").write_text("export const ready = true;\n", encoding="utf-8")
+
+    with TestClient(create_app(Settings(data_dir=tmp_path / "data"), dist_dir=dist)) as test_client:
+        asset = test_client.get("/assets/index-abc.js")
+
+    assert asset.status_code == 200
+    assert "text/javascript" in asset.headers["content-type"]
+    assert "export const ready = true;" in asset.text
+
+
+def test_routes_registered_after_create_app_stay_reachable(tmp_path: Path) -> None:
+    """Later tasks add routes after `create_app()` returns; they must work.
+
+    The frontend is the router's default handler, so a route registered later
+    is matched before the frontend sees the request.
+    """
+    app = create_app(Settings(data_dir=tmp_path / "data"), dist_dir=tmp_path / "dist")
+
+    @app.post("/api/projects")
+    def create_project() -> dict[str, str]:
+        return {"id": "project-1"}
+
+    with TestClient(app) as test_client:
+        response = test_client.post("/api/projects")
+
+    assert response.status_code == 200
+    assert response.json() == {"id": "project-1"}
+
+
+def test_an_unrouted_post_is_a_404(tmp_path: Path) -> None:
+    """The frontend fallback must not answer non-navigational requests."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<!doctype html><title>pilot</title>", encoding="utf-8")
+
+    with TestClient(create_app(Settings(data_dir=tmp_path / "data"), dist_dir=dist)) as test_client:
+        response = test_client.post("/api/projects")
+
+    assert response.status_code == 404
+
+
+def test_the_converter_path_is_resolved_to_an_absolute_path() -> None:
+    """The converter check must not depend on the working directory."""
+    settings = Settings(build_lod=Path("build-lod.exe"))
+
+    assert settings.build_lod == Path("build-lod.exe").resolve()
+    assert settings.build_lod.is_absolute()
+
+
+def test_a_failed_statement_reports_its_own_error(tmp_path: Path) -> None:
+    """A failure inside the transaction must surface the real cause."""
+    db_path = tmp_path / "pilot.sqlite3"
+    db.initialize(db_path)
+
+    with pytest.raises(sqlite3.OperationalError, match="no such table"):
+        with db.transaction(db_path) as connection:
+            connection.execute("INSERT INTO missing_table VALUES (1)")
+
+    # The failed statement must not have left a transaction open.
+    connection = db.connect(db_path)
+    try:
+        assert connection.in_transaction is False
+    finally:
+        connection.close()
+
+
+def test_a_locked_database_reports_the_lock_error(tmp_path: Path) -> None:
+    """A `BEGIN IMMEDIATE` that cannot start must not be masked by a rollback."""
+    db_path = tmp_path / "pilot.sqlite3"
+    db.initialize(db_path)
+
+    blocker = sqlite3.connect(db_path, isolation_level=None)
+    blocker.execute("PRAGMA busy_timeout = 0")
+    blocker.execute("BEGIN EXCLUSIVE")
+    blocker.execute("CREATE TABLE IF NOT EXISTS blocker (id INTEGER PRIMARY KEY)")
+    try:
+        with pytest.raises(sqlite3.OperationalError) as error:
+            with db.transaction(db_path):
+                pass
+    finally:
+        blocker.execute("ROLLBACK")
+        blocker.close()
+
+    message = str(error.value).lower()
+    assert "rollback" not in message
+    assert "locked" in message or "busy" in message

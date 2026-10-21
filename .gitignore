@@ -15,6 +15,7 @@ build/
 .env
 .env.*
 !.env.example
+*.egg-info/
 
 # Mutable application state: SQLite database, server secret, uploads, logs.
 /data/

@@ -42,7 +42,9 @@ class Settings:
     def __post_init__(self) -> None:
         object.__setattr__(self, "data_dir", Path(self.data_dir).expanduser().resolve())
         if self.build_lod is not None:
-            object.__setattr__(self, "build_lod", Path(self.build_lod).expanduser())
+            # Resolved like `data_dir` so the converter check does not depend
+            # on the process working directory.
+            object.__setattr__(self, "build_lod", Path(self.build_lod).expanduser().resolve())
         if not 1 <= self.port <= 65535:
             raise ValueError(f"NEMY_PORT must be between 1 and 65535, got {self.port}")
         for name in POSITIVE_FIELDS:
