@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+.worktrees/
 .env
 .env.*
 !.env.example
