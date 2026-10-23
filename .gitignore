@@ -20,3 +20,13 @@ build/
 
 # Mutable application state: SQLite database, server secret, uploads, logs.
 /data/
+
+# Local planning and agent handover material.
+/AGENTS.md
+/session-handoff.md
+/docs/superpowers/
+/.superpowers/
+/.claude/
+/.claude-flow/
+/.swarm/
+/delivery/
