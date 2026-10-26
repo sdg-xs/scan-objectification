@@ -19,6 +19,12 @@ Drag to orbit, right-drag to pan, and scroll to zoom. **Fit all** or **F** frame
 
 Layers start centered independently. Adjust the scan up axis, translation, rotation and uniform scale, then click **Apply**. **Reset** restores centered placement. Alignment is not saved; refreshing requires selecting the files again.
 
+## Interactive section box
+
+Enable **Section box** in the lower-left corner of the viewport. In **Resize** mode, drag a colored face handle to move that side of the box. In **Move** mode, drag the axis arrows to move the whole box. **Reset box** fits the box around the visible layers; switching it off restores the complete view. Escape cancels a face resize.
+
+The same Z-up box clips the IFC and Gaussian layers. These are temporary visual cuts and do not modify or export source files. Mesh cuts have open surfaces; Gaussian masking works on splat centers, so splat footprints can soften the boundary. No numeric section-box inputs or additional dependencies are used.
+
 ## Saved scan placement
 
 `test_files/BS17-PLY-aligned.ply` contains the manually aligned scan with translation X 17, Y 5.9, Z -3 baked into its positions. Rotation was zero and scale was one. The original PLY is unchanged. The viewer recognizes the saved Z-up placement and does not center it again; load this copy with alignment controls at zero.

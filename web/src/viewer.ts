@@ -5,6 +5,7 @@ import type { FragmentsModel } from "@thatopen/fragments";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import fragmentsWorkerUrl from "@thatopen/fragments/worker?url";
 import wasmUrl from "web-ifc/web-ifc.wasm?url";
+import { SectionBox } from "./section-box";
 import {
   applyScanTransform,
   centerModel,
@@ -83,6 +84,17 @@ async function start(): Promise<void> {
   let bimBounds = new THREE.Box3();
   let scanBounds = new THREE.Box3();
   let disposed = false;
+  const section = new SectionBox({
+    scene,
+    camera,
+    canvas: renderer.domElement,
+    orbit: controls,
+    toolbar: element("section-tools", HTMLElement),
+    bounds: sceneBounds,
+    onChange: () => {
+      void fragments.update().catch(showError);
+    },
+  });
 
   const resize = () => {
     const { width, height } = viewport.getBoundingClientRect();
@@ -98,7 +110,9 @@ async function start(): Promise<void> {
   });
   renderer.setAnimationLoop(() => {
     controls.update();
+    renderer.clippingPlanes = section.planes;
     renderer.render(scene, camera);
+    section.render(renderer);
   });
 
   function frame(box: THREE.Box3): void {
@@ -127,10 +141,15 @@ async function start(): Promise<void> {
     return scanBounds.clone().applyMatrix4(scanGroup.matrixWorld);
   }
 
-  function frameScene(): void {
+  function sceneBounds(): THREE.Box3 {
     const box = new THREE.Box3();
     if (bim && bimGroup.visible) box.union(bimBounds);
     if (splats && scanGroup.visible) box.union(worldScanBounds());
+    return box;
+  }
+
+  function frameScene(): void {
+    const box = sceneBounds();
     if (!box.isEmpty()) frame(box);
   }
 
@@ -142,6 +161,7 @@ async function start(): Promise<void> {
     ifcFit.disabled = !bim;
     plyFit.disabled = !splats;
     scanControls.disabled = !splats;
+    section.setAvailable(count > 0);
     frameScene();
   }
 
@@ -171,7 +191,11 @@ async function start(): Promise<void> {
       });
       if (disposed) return;
       status("ifc-status", `${file.name} · preparing geometry…`);
-      pending = await fragments.load(bytes, { modelId, camera });
+      pending = await fragments.load(bytes, {
+        modelId,
+        camera,
+        clippingPlanes: section.planes,
+      });
       if (pending.box.isEmpty())
         throw new Error("The IFC contains no supported geometry.");
       const loadedModel = pending;
@@ -346,6 +370,7 @@ async function start(): Promise<void> {
     observer.disconnect();
     renderer.setAnimationLoop(null);
     controls.dispose();
+    section.dispose();
     splats?.dispose();
     spark.dispose();
     void fragments.dispose();

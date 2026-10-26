@@ -131,6 +131,24 @@
         <p class="privacy">Files stay in this browser. Nothing is uploaded.</p>
       </aside>
       <section id="viewport" aria-label="3D model viewport">
+        <div
+          id="section-tools"
+          class="section-tools"
+          aria-label="Section box controls"
+        >
+          <label
+            ><input id="section-enabled" type="checkbox" disabled /> Section
+            box</label
+          >
+          <div class="section-actions">
+            <button id="section-resize" aria-pressed="true" disabled>
+              Resize</button
+            ><button id="section-move" aria-pressed="false" disabled>
+              Move</button
+            ><button id="section-reset" disabled>Reset box</button>
+          </div>
+          <p id="section-hint">Clip both layers with one box.</p>
+        </div>
         <div class="view-toolbar">
           <span class="view-label">PERSPECTIVE <span>/ Z UP</span></span
           ><button id="fit-all" disabled>Fit all <kbd>F</kbd></button>

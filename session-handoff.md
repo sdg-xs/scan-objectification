@@ -2,6 +2,8 @@
 
 ## Latest milestone — 2026-10-26
 
+The viewer now also has an interactive section box: enable it in the viewport, drag face grips in Resize mode or axis arrows in Move mode, and use Reset box to refit. Three.js controls/planes, Fragments culling and Spark box masking share one world-space box. Source files are unchanged. Playwright verified face cuts, movement, cancellation/navigation recovery and disabling; current gates pass with 43 backend, 21 frontend and 2 PLY-tool tests. The saved `test_files/BS17-PLY-aligned.ply` contains the earlier translation (17, 5.9, -3); it is gitignored.
+
 The user changed the immediate priority to a local IFC + Gaussian PLY viewer. It is implemented on `feat/bim-gaussian-viewer` at `/viewer.html` using That Open Fragments, Three.js and Spark. See `README.md` and `docs/superpowers/plans/2026-10-26-local-bim-gaussian-viewer.md` for setup and verification. Both actual BS17 files rendered in Chrome under production CSP. Controls include orbit/pan/zoom, visibility, framing and manual scan alignment. Files and alignment are session-only; no backend upload or persistence was added. USD Tasks 3–7 below remain pending. Existing dependency pins are unchanged, new IFC dependencies have exact pins, and test files are gitignored.
 
 Source session: [Reverse engineer Nemy asset metadata](https://chatgpt.com/s/cx_6ad7ed3544c081919cf54f6a1746f86f)

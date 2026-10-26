@@ -1,3 +1,40 @@
+.section-tools {
+  position: absolute;
+  bottom: 58px;
+  left: 24px;
+  z-index: 3;
+  background: #18241ff0;
+  border: 1px solid #52634c;
+  border-radius: 5px;
+  padding: 12px 14px;
+  max-width: calc(100% - 48px);
+  color: #e4e9e8;
+  font-size: 12px;
+}
+.section-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.section-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.section-actions button {
+  font-size: 11px;
+  padding: 6px 10px;
+}
+.section-actions button[aria-pressed="true"] {
+  border-color: #b9e38a;
+  color: #b9e38a;
+}
+.section-tools p {
+  font-size: 10px;
+  margin: 8px 0 0;
+  max-width: 240px;
+}
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
   color: #e4e9e8;
