@@ -436,6 +436,17 @@ kbd {
 [hidden] {
   display: none !important;
 }
+.asset-marquee {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  border: 1px solid #b7f0a0;
+  background: #a5e78424;
+}
+.asset-drawing { cursor: crosshair; }
+#asset-tools { border: 0; padding: 0; margin: 12px 0; min-width: 0; }
+#asset-tools .button-row { margin-top: 9px; }
+#asset-draw[aria-pressed="true"] { background: #b7df92; color: #152416; }
 @media (max-width: 760px) {
   .topbar {
     padding: 0 16px;

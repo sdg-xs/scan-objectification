@@ -203,6 +203,15 @@ export class SectionBox {
     this.enabledInput.disabled = !available;
   }
 
+  getBounds(): THREE.Box3 | undefined {
+    return this.enabled ? this.box.clone() : undefined;
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabledInput.checked = enabled;
+    this.enabledInput.dispatchEvent(new Event("change"));
+  }
+
   private reset(): void {
     const bounds = this.options.bounds();
     if (bounds.isEmpty()) return;

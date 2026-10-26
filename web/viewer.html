@@ -54,8 +54,23 @@
             Frame scan ↗
           </button>
         </section>
+        <section class="layer" aria-label="Asset selection">
+          <span class="eyebrow">02 / ASSET</span>
+          <h2>Isolate an asset</h2>
+          <fieldset id="asset-tools" disabled>
+            <label class="axis-select">Selection mode<select id="asset-operation">
+              <option value="replace">Replace selection</option>
+              <option value="add">Add to selection</option>
+              <option value="remove">Remove from selection</option>
+            </select></label>
+            <div class="button-row"><button id="asset-draw" aria-pressed="false">Draw box</button><button id="asset-section">Select section</button></div>
+            <div class="button-row"><button id="asset-isolate" disabled>Isolate asset</button><button id="asset-clear">Clear</button></div>
+          </fieldset>
+          <p id="asset-status" class="hint" role="status">Load a scan to select an asset.</p>
+          <p class="hint">Manual selection · boxes select through depth. Use the section box to limit depth. SAM assistance awaits model setup.</p>
+        </section>
         <section class="alignment">
-          <span class="eyebrow">02 / ALIGNMENT</span>
+          <span class="eyebrow">03 / ALIGNMENT</span>
           <h2>Place the scan</h2>
           <p class="hint">
             Layers start centered independently. Adjust the scan to match the

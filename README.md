@@ -25,6 +25,18 @@ Enable **Section box** in the lower-left corner of the viewport. In **Resize** m
 
 The same Z-up box clips the IFC and Gaussian layers. These are temporary visual cuts and do not modify or export source files. Mesh cuts have open surfaces; Gaussian masking works on splat centers, so splat footprints can soften the boundary. No numeric section-box inputs or additional dependencies are used.
 
+## Manual asset isolation
+
+Load a Gaussian PLY, then use **Isolate an asset** in the sidebar:
+
+1. Choose **Replace**, **Add**, or **Remove**, click **Draw box**, and drag over the scan. Green splats preview the selection; other splats are dimmed.
+2. Boxes select splat centers through depth. For a tight 3D region, enable and adjust the interactive **Section box**, then click **Select section**. A drawn box also respects the active section region.
+3. Click **Isolate asset** to hide other splats and the BIM. Orbit to inspect; **Show context** restores the previous layer visibility, section and camera view. **Clear** discards the selection.
+
+Escape cancels a box drag or an in-progress selection. Replacing a model or changing scan placement clears the selection. Selection is temporary and does not edit the PLY. Original Gaussian properties, including directional color, remain intact.
+
+This is manual isolation. SAM inference, saved selections, recognition and asset export are not connected; local SAM weights are not installed.
+
 ## Saved scan placement
 
 `test_files/BS17-PLY-aligned.ply` contains the manually aligned scan with translation X 17, Y 5.9, Z -3 baked into its positions. Rotation was zero and scale was one. The original PLY is unchanged. The viewer recognizes the saved Z-up placement and does not center it again; load this copy with alignment controls at zero.
@@ -53,7 +65,7 @@ Open http://127.0.0.1:8767/viewer.html. The existing project shell remains at `/
 
 ## Limits and verification
 
-This milestone requires WebGL2 and loads files into browser memory. Server uploads, saved alignment, BIM properties, segmentation, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
+This milestone requires WebGL2 and loads files into browser memory. Server uploads, BIM properties, AI segmentation, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
 
 Verified in Chrome with `BS17-IFC.ifc` (24.3 MB) and `BS17-PLY.ply` (325 MB; 4,778,721 splats), including production CSP. This is not a target-PC performance benchmark. Fragments' guarded optional WebGPU code emits build warnings about exports unavailable in the WebGL Three.js entry; the tested viewer uses WebGL.
 

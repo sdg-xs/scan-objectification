@@ -6,6 +6,7 @@ import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import fragmentsWorkerUrl from "@thatopen/fragments/worker?url";
 import wasmUrl from "web-ifc/web-ifc.wasm?url";
 import { SectionBox } from "./section-box";
+import { AssetSelection } from "./asset-selection";
 import {
   applyScanTransform,
   centerModel,
@@ -95,6 +96,41 @@ async function start(): Promise<void> {
       void fragments.update().catch(showError);
     },
   });
+  const selection = new AssetSelection({
+    viewport, canvas: renderer.domElement, camera, orbit: controls, section, frame,
+    error: showError,
+    isolateContext: () => {
+      const bimVisible = bimGroup.visible;
+      const scanVisible = scanGroup.visible;
+      const gridVisible = grid.visible;
+      const position = camera.position.clone();
+      const target = controls.target.clone();
+      const near = camera.near;
+      const far = camera.far;
+      const maxDistance = controls.maxDistance;
+      const ifcVisible = element("ifc-visible", HTMLInputElement);
+      const plyVisible = element("ply-visible", HTMLInputElement);
+      bimGroup.visible = false;
+      scanGroup.visible = true;
+      grid.visible = false;
+      ifcVisible.checked = false;
+      plyVisible.checked = true;
+      ifcVisible.disabled = plyVisible.disabled = true;
+      return () => {
+        bimGroup.visible = ifcVisible.checked = bimVisible;
+        scanGroup.visible = plyVisible.checked = scanVisible;
+        grid.visible = gridVisible;
+        camera.position.copy(position);
+        controls.target.copy(target);
+        camera.near = near;
+        camera.far = far;
+        controls.maxDistance = maxDistance;
+        camera.updateProjectionMatrix();
+        controls.update();
+        ifcVisible.disabled = plyVisible.disabled = false;
+      };
+    },
+  });
 
   const resize = () => {
     const { width, height } = viewport.getBoundingClientRect();
@@ -149,7 +185,7 @@ async function start(): Promise<void> {
   }
 
   function frameScene(): void {
-    const box = sceneBounds();
+    const box = selection.getIsolatedBounds() ?? sceneBounds();
     if (!box.isEmpty()) frame(box);
   }
 
@@ -168,6 +204,7 @@ async function start(): Promise<void> {
   ifcInput.addEventListener("change", async () => {
     const file = ifcInput.files?.[0];
     if (!file) return;
+    selection.clear();
     ifcInput.disabled = true;
     errorNotice.hidden = true;
     status("ifc-status", `${file.name} · reading IFC…`);
@@ -201,6 +238,7 @@ async function start(): Promise<void> {
       const loadedModel = pending;
       setSourceUp(loadedModel.object, "y");
       const bounds = centerModel(loadedModel.object, () => loadedModel.box);
+      selection.clear();
       if (bim) {
         bimGroup.remove(bim.object);
         await fragments.disposeModel(bim.modelId);
@@ -244,6 +282,7 @@ async function start(): Promise<void> {
   plyInput.addEventListener("change", async () => {
     const file = plyInput.files?.[0];
     if (!file) return;
+    selection.clear();
     plyInput.disabled = true;
     errorNotice.hidden = true;
     status("ply-status", `${file.name} · decoding Gaussian data…`);
@@ -273,6 +312,7 @@ async function start(): Promise<void> {
       if (pending.getBoundingBox().isEmpty())
         throw new Error("The PLY contains no splats.");
       if (splats) {
+        selection.setScan(undefined);
         scanGroup.remove(splats);
         splats.dispose();
       }
@@ -283,6 +323,7 @@ async function start(): Promise<void> {
       scanGroup.add(splats);
       form.reset();
       orientScan();
+      selection.setScan(splats);
       status(
         "ply-status",
         `${file.name} · ${splats.numSplats.toLocaleString()} splats · loaded`,
@@ -320,6 +361,7 @@ async function start(): Promise<void> {
   ifcFit.addEventListener("click", () => frame(bimBounds));
   plyFit.addEventListener("click", () => frame(worldScanBounds()));
   axis.addEventListener("change", () => {
+    selection.clear();
     orientScan();
     frame(worldScanBounds());
   });
@@ -335,6 +377,7 @@ async function start(): Promise<void> {
     event.preventDefault();
     const values = new FormData(form);
     try {
+      selection.clear();
       applyScanTransform(scanGroup, {
         x: Number(values.get("x")),
         y: Number(values.get("y")),
@@ -353,6 +396,7 @@ async function start(): Promise<void> {
     }
   });
   form.addEventListener("reset", () => {
+    selection.clear();
     applyScanTransform(scanGroup, {
       x: 0,
       y: 0,
@@ -369,6 +413,7 @@ async function start(): Promise<void> {
     disposed = true;
     observer.disconnect();
     renderer.setAnimationLoop(null);
+    selection.dispose();
     controls.dispose();
     section.dispose();
     splats?.dispose();
