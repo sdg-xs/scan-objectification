@@ -11,6 +11,7 @@ import {
   frameBounds,
   validateModelHeader,
   setSourceUp,
+  hasSavedPlyPlacement,
 } from "./viewer-model";
 
 function element<T extends HTMLElement>(id: string, type: { new (): T }): T {
@@ -78,6 +79,7 @@ async function start(): Promise<void> {
   scene.add(bimGroup, scanGroup);
   let bim: FragmentsModel | undefined;
   let splats: SplatMesh | undefined;
+  let savedPlyPlacement = false;
   let bimBounds = new THREE.Box3();
   let scanBounds = new THREE.Box3();
   let disposed = false;
@@ -207,9 +209,11 @@ async function start(): Promise<void> {
     setSourceUp(splats, axis.value === "z" ? "z" : "y");
     splats.updateMatrix();
     scanBounds = splats.getBoundingBox().clone().applyMatrix4(splats.matrix);
-    const center = scanBounds.getCenter(new THREE.Vector3());
-    splats.position.sub(center);
-    scanBounds.translate(center.negate());
+    if (!savedPlyPlacement) {
+      const center = scanBounds.getCenter(new THREE.Vector3());
+      splats.position.sub(center);
+      scanBounds.translate(center.negate());
+    }
     scanGroup.updateMatrixWorld(true);
   }
 
@@ -221,7 +225,9 @@ async function start(): Promise<void> {
     status("ply-status", `${file.name} · decoding Gaussian data…`);
     let pending: SplatMesh | undefined;
     try {
-      validateModelHeader("ply", await file.slice(0, 65536).text());
+      const header = await file.slice(0, 65536).text();
+      validateModelHeader("ply", header);
+      const hasPlacement = hasSavedPlyPlacement(header);
       pending = new SplatMesh({
         stream: file.stream(),
         streamLength: file.size,
@@ -247,6 +253,9 @@ async function start(): Promise<void> {
         splats.dispose();
       }
       splats = pending;
+      savedPlyPlacement = hasPlacement;
+      if (hasPlacement) axis.value = "z";
+      axis.disabled = hasPlacement;
       scanGroup.add(splats);
       form.reset();
       orientScan();

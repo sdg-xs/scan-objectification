@@ -14,6 +14,14 @@ export function setSourceUp(object: Object3D, sourceUp: "y" | "z"): void {
   object.rotation.set(sourceUp === "y" ? Math.PI / 2 : 0, 0, 0);
 }
 
+export function hasSavedPlyPlacement(header: string): boolean {
+  const lines = header.split(/\r?\n/);
+  const end = lines.indexOf("end_header");
+  return (
+    end >= 0 && lines.slice(0, end).includes("comment nemy_aligned_z_up 1")
+  );
+}
+
 export function validateModelHeader(kind: "ifc" | "ply", header: string): void {
   const valid =
     kind === "ifc"

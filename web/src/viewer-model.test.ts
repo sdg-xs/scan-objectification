@@ -6,7 +6,20 @@ import {
   frameBounds,
   validateModelHeader,
   setSourceUp,
+  hasSavedPlyPlacement,
 } from "./viewer-model";
+
+it("recognizes aligned PLY coordinates without treating body text as placement metadata", () => {
+  expect(
+    hasSavedPlyPlacement("ply\ncomment nemy_aligned_z_up 1\nend_header\n"),
+  ).toBe(true);
+  expect(
+    hasSavedPlyPlacement("ply\nend_header\ncomment nemy_aligned_z_up 1\n"),
+  ).toBe(false);
+  expect(hasSavedPlyPlacement("ply\ncomment offsetx 17\nend_header\n")).toBe(
+    false,
+  );
+});
 
 it("keeps native Z-up scans upright and converts Y-up BIM geometry to Z-up", () => {
   const object = new Group();
@@ -15,7 +28,9 @@ it("keeps native Z-up scans upright and converts Y-up BIM geometry to Z-up", () 
   expect(up.z).toBeCloseTo(1);
   expect(up.y).toBeCloseTo(0);
   setSourceUp(object, "z");
-  expect(new Vector3(0, 0, 1).applyQuaternion(object.quaternion).toArray()).toEqual([0, 0, 1]);
+  expect(
+    new Vector3(0, 0, 1).applyQuaternion(object.quaternion).toArray(),
+  ).toEqual([0, 0, 1]);
 });
 
 describe("camera framing", () => {

@@ -19,6 +19,21 @@ Drag to orbit, right-drag to pan, and scroll to zoom. **Fit all** or **F** frame
 
 Layers start centered independently. Adjust the scan up axis, translation, rotation and uniform scale, then click **Apply**. **Reset** restores centered placement. Alignment is not saved; refreshing requires selecting the files again.
 
+## Saved scan placement
+
+`test_files/BS17-PLY-aligned.ply` contains the manually aligned scan with translation X 17, Y 5.9, Z -3 baked into its positions. Rotation was zero and scale was one. The original PLY is unchanged. The viewer recognizes the saved Z-up placement and does not center it again; load this copy with alignment controls at zero.
+
+Coordinates in this copy are relative to the viewer's centered IFC, not the original survey origin. Obsolete survey-offset comments are removed. The private placement comment only tells this viewer to preserve coordinates; other PLY tools can read the baked coordinates normally.
+
+The translation-only helper streams standard binary little-endian PLY with float32 vertex properties:
+
+```powershell
+node scripts/save-aligned-ply.mjs test_files/BS17-PLY.ply test_files/BS17-PLY-aligned.ply 17 5.9 -3
+node --test scripts/save-aligned-ply.test.mjs
+```
+
+It refuses to overwrite an existing output. This helper does not bake rotation, scaling, or a source-up-axis conversion.
+
 ## Production
 
 With Python 3.12 and backend dependencies installed in `.venv`:
