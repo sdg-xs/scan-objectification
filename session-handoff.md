@@ -1,5 +1,9 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Latest milestone — 2026-10-26
+
+The user changed the immediate priority to a local IFC + Gaussian PLY viewer. It is implemented on `feat/bim-gaussian-viewer` at `/viewer.html` using That Open Fragments, Three.js and Spark. See `README.md` and `docs/superpowers/plans/2026-10-26-local-bim-gaussian-viewer.md` for setup and verification. Both actual BS17 files rendered in Chrome under production CSP. Controls include orbit/pan/zoom, visibility, framing and manual scan alignment. Files and alignment are session-only; no backend upload or persistence was added. USD Tasks 3–7 below remain pending. Existing dependency pins are unchanged, new IFC dependencies have exact pins, and test files are gitignored.
+
 Source session: [Reverse engineer Nemy asset metadata](https://chatgpt.com/s/cx_6ad7ed3544c081919cf54f6a1746f86f)
 
 Date captured: 2026-10-21
@@ -177,4 +181,3 @@ is `docs/superpowers/plans/2026-10-22-usd-web-segmentation-continuation.md`.
 **Blockers requiring the target GPU PC:** no Rust toolchain (so `build-lod` must be built from a
 source checkout of Spark `v2.3.1`) and no NVIDIA GPU. Task 5's real conversion, Task 6's visual
 fixture check, and Task 7's benchmarks are target-PC work; everything else is buildable here.
-

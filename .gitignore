@@ -20,3 +20,8 @@ build/
 
 # Mutable application state: SQLite database, server secret, uploads, logs.
 /data/
+
+# Local acceptance models and browser verification artifacts.
+/test_files/
+/output/playwright/
+/.playwright-cli/

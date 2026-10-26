@@ -12,10 +12,14 @@
   },
   "dependencies": {
     "@sparkjsdev/spark": "2.3.1",
+    "@thatopen/fragments": "3.6.0",
     "hash-wasm": "4.12.0",
-    "three": "0.186.1"
+    "three": "0.186.1",
+    "web-ifc": "0.0.77"
   },
   "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/three": "0.186.0",
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.5"

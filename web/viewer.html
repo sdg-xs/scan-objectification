@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nemy — BIM + Gaussian viewer</title>
+    <link rel="stylesheet" href="/src/viewer.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">NEMY<span> / </span>VIEWER</a>
+      <span class="workspace"
+        >BIM + GAUSSIAN <span class="badge">LOCAL PREVIEW</span></span
+      >
+    </header>
+    <main class="workspace-grid">
+      <aside class="sidebar" aria-label="Scene controls">
+        <div class="intro">
+          <span class="eyebrow">01 / SCENE</span>
+          <h1>Model meets reality.</h1>
+          <p>Open a building model and a Gaussian scan in one view.</p>
+        </div>
+        <section class="layer">
+          <div class="section-heading">
+            <h2><span class="layer-dot bim-dot"></span>BIM model</h2>
+            <label class="toggle"
+              ><input id="ifc-visible" type="checkbox" checked />Show</label
+            >
+          </div>
+          <label class="file-button"
+            >Open IFC<input id="ifc-file" type="file" accept=".ifc"
+          /></label>
+          <p id="ifc-status" class="file-status" role="status">
+            No model loaded
+          </p>
+          <button id="ifc-fit" class="text-button" disabled>
+            Frame model ↗
+          </button>
+        </section>
+        <section class="layer">
+          <div class="section-heading">
+            <h2><span class="layer-dot scan-dot"></span>Gaussian scan</h2>
+            <label class="toggle"
+              ><input id="ply-visible" type="checkbox" checked />Show</label
+            >
+          </div>
+          <label class="file-button"
+            >Open Gaussian PLY<input id="ply-file" type="file" accept=".ply"
+          /></label>
+          <p id="ply-status" class="file-status" role="status">
+            No scan loaded
+          </p>
+          <button id="ply-fit" class="text-button" disabled>
+            Frame scan ↗
+          </button>
+        </section>
+        <section class="alignment">
+          <span class="eyebrow">02 / ALIGNMENT</span>
+          <h2>Place the scan</h2>
+          <p class="hint">
+            Layers start centered independently. Adjust the scan to match the
+            BIM; survey coordinates are not aligned automatically.
+          </p>
+          <fieldset id="scan-controls" disabled>
+            <label class="axis-select"
+              >Scan up axis<select id="scan-axis">
+                <option value="z">Z up (survey)</option>
+                <option value="y">Y up</option>
+              </select></label
+            >
+            <form id="transform-form">
+              <span class="field-caption">Position · viewer units</span>
+              <div class="triple">
+                <label
+                  >X<input
+                    name="x"
+                    type="number"
+                    value="0"
+                    step="0.1"
+                    required /></label
+                ><label
+                  >Y<input
+                    name="y"
+                    type="number"
+                    value="0"
+                    step="0.1"
+                    required /></label
+                ><label
+                  >Z<input name="z" type="number" value="0" step="0.1" required
+                /></label>
+              </div>
+              <span class="field-caption">Rotation · degrees</span>
+              <div class="triple">
+                <label
+                  >X<input
+                    name="rx"
+                    type="number"
+                    value="0"
+                    step="1"
+                    required /></label
+                ><label
+                  >Y<input
+                    name="ry"
+                    type="number"
+                    value="0"
+                    step="1"
+                    required /></label
+                ><label
+                  >Z<input name="rz" type="number" value="0" step="1" required
+                /></label>
+              </div>
+              <label class="scale-label"
+                >Uniform scale<input
+                  name="scale"
+                  type="number"
+                  value="1"
+                  min="0.000001"
+                  step="any"
+                  required
+              /></label>
+              <div class="button-row">
+                <button type="submit" class="apply">Apply</button
+                ><button type="reset">Reset</button>
+              </div>
+            </form>
+          </fieldset>
+          <p id="alignment-status" class="hint" role="status">
+            Alignment changes last for this session.
+          </p>
+        </section>
+        <p class="privacy">Files stay in this browser. Nothing is uploaded.</p>
+      </aside>
+      <section id="viewport" aria-label="3D model viewport">
+        <div class="view-toolbar">
+          <span class="view-label">PERSPECTIVE <span>/ Y UP</span></span
+          ><button id="fit-all" disabled>Fit all <kbd>F</kbd></button>
+        </div>
+        <div id="empty-state">
+          <span class="crosshair">+</span>
+          <h2>Your scene starts here.</h2>
+          <p>
+            Open an IFC model or Gaussian PLY to begin.<br />Load both to
+            compare design with the captured site.
+          </p>
+        </div>
+        <p id="viewer-error" role="alert" hidden></p>
+        <div class="view-footer">
+          <span
+            ><i></i> <span id="scene-status">Ready for local files</span></span
+          ><span>Drag to orbit · Right-drag to pan · Scroll to zoom</span>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/viewer.ts"></script>
+  </body>
+</html>
