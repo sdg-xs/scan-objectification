@@ -10,6 +10,7 @@ import {
   centerModel,
   frameBounds,
   validateModelHeader,
+  setSourceUp,
 } from "./viewer-model";
 
 function element<T extends HTMLElement>(id: string, type: { new (): T }): T {
@@ -54,15 +55,19 @@ async function start(): Promise<void> {
   viewport.prepend(renderer.domElement);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 10000);
-  camera.position.set(25, 20, 25);
+  camera.up.set(0, 0, 1);
+  camera.position.set(25, -25, 20);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x6b8070, 2));
+  const sky = new THREE.HemisphereLight(0xffffff, 0x6b8070, 2);
+  sky.position.set(0, 0, 1);
+  scene.add(sky);
   const sun = new THREE.DirectionalLight(0xffffff, 2);
-  sun.position.set(15, 30, 10);
+  sun.position.set(15, -10, 30);
   scene.add(sun);
   const grid = new THREE.GridHelper(200, 40, 0x425f4d, 0x253b30);
-  grid.position.y = -0.02;
+  grid.rotation.x = Math.PI / 2;
+  grid.position.z = -0.02;
   scene.add(grid);
   const spark = new SparkRenderer({ renderer });
   scene.add(spark);
@@ -101,7 +106,7 @@ async function start(): Promise<void> {
       camera.position
         .copy(view.target)
         .addScaledVector(
-          new THREE.Vector3(1, 0.7, 1).normalize(),
+          new THREE.Vector3(1, -1, 0.7).normalize(),
           view.distance,
         );
       camera.near = view.near;
@@ -168,6 +173,7 @@ async function start(): Promise<void> {
       if (pending.box.isEmpty())
         throw new Error("The IFC contains no supported geometry.");
       const loadedModel = pending;
+      setSourceUp(loadedModel.object, "y");
       const bounds = centerModel(loadedModel.object, () => loadedModel.box);
       if (bim) {
         bimGroup.remove(bim.object);
@@ -198,7 +204,7 @@ async function start(): Promise<void> {
   function orientScan(): void {
     if (!splats) return;
     splats.position.set(0, 0, 0);
-    splats.rotation.set(axis.value === "z" ? -Math.PI / 2 : 0, 0, 0);
+    setSourceUp(splats, axis.value === "z" ? "z" : "y");
     splats.updateMatrix();
     scanBounds = splats.getBoundingBox().clone().applyMatrix4(splats.matrix);
     const center = scanBounds.getCenter(new THREE.Vector3());

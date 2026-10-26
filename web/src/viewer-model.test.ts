@@ -5,7 +5,18 @@ import {
   centerModel,
   frameBounds,
   validateModelHeader,
+  setSourceUp,
 } from "./viewer-model";
+
+it("keeps native Z-up scans upright and converts Y-up BIM geometry to Z-up", () => {
+  const object = new Group();
+  setSourceUp(object, "y");
+  const up = new Vector3(0, 1, 0).applyQuaternion(object.quaternion);
+  expect(up.z).toBeCloseTo(1);
+  expect(up.y).toBeCloseTo(0);
+  setSourceUp(object, "z");
+  expect(new Vector3(0, 0, 1).applyQuaternion(object.quaternion).toArray()).toEqual([0, 0, 1]);
+});
 
 describe("camera framing", () => {
   it("fits a tall model in a narrow viewport without clipping", () => {

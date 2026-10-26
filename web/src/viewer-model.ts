@@ -10,6 +10,10 @@ export interface ScanTransform {
   scale: number;
 }
 
+export function setSourceUp(object: Object3D, sourceUp: "y" | "z"): void {
+  object.rotation.set(sourceUp === "y" ? Math.PI / 2 : 0, 0, 0);
+}
+
 export function validateModelHeader(kind: "ifc" | "ply", header: string): void {
   const valid =
     kind === "ifc"
