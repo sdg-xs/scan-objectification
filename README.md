@@ -35,7 +35,7 @@ Classification actions use compact icon buttons. Pause the pointer over an icon 
 2. Expand **New layer / group**. Create a group such as `Level 1`, then a layer such as `Ceiling` inside it. A newly created layer becomes the current **Target Layer**.
 3. Choose a **Target Layer** from the list or its target icon, then use the **Classify** icon. Selected objects move into that layer under **Classified**, and the selection clears. Checking objects does not change the target layer.
 4. Select existing objects using their row checkboxes. **Unclassify** returns them to Unclassified; **Clear selection** restores normal highlighting.
-5. Use eye icons at root, group, layer or object level to control visibility. The scan-context icon controls the remaining source within Unclassified. The palette icon toggles layer-color tinting; turn it off to restore source colors.
+5. Use eye icons at root, group, layer or object level to control visibility. Unsegmented splats follow Unclassified visibility. The palette icon toggles layer-color tinting; turn it off to restore source colors.
 
 Rename objects, layers and groups in the tree. Move a layer between groups using its group selector. Removing a layer unclassifies its objects; removing a group keeps its layers; removing an object returns its splats to unsegmented context. Each splat belongs to one object, and new segmentation takes ownership where results overlap. Records last for the loaded scan and follow alignment changes; reloading or replacing it clears them. Source files and Gaussian properties are unchanged. Saving/exporting classifications is future work. The previous manual asset controls are temporarily hidden; SAM occupies sidebar slot **02**.
 

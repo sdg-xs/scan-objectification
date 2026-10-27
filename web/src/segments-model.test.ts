@@ -32,7 +32,7 @@ it("combines group and individual visibility without losing child states", () =>
   layer.visible = false;
   expect([...scene.visibility()]).toEqual([0, 0, 1, 1]);
   layer.visible = true;
-  scene.contextVisible = false;
+  scene.unclassifiedVisible = false;
   expect([...scene.visibility()]).toEqual([0, 1, 0, 0]);
 });
 

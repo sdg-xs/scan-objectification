@@ -10,7 +10,6 @@ export class SegmentPanel {
   private readonly model = new SegmentCollection();
   private readonly list = document.querySelector<HTMLDivElement>("#segment-list")!;
   private readonly status = document.querySelector<HTMLParagraphElement>("#segment-status")!;
-  private readonly context = document.querySelector<HTMLInputElement>("#segment-context")!;
   private readonly target = document.querySelector<HTMLSelectElement>("#segment-target")!;
   private readonly colors = document.querySelector<HTMLInputElement>("#segment-colors")!;
   private readonly events = new AbortController();
@@ -30,9 +29,7 @@ export class SegmentPanel {
       ["segment-new-group", "group", "Create a group"],
       ["segment-new-layer", "layer", "Create a layer and set it as Target Layer"],
     ] as const) classificationButton(document.querySelector<HTMLButtonElement>(`#${id}`)!, icon, label);
-    classificationToggle(this.context, "scan", "Show unsegmented scan context");
     classificationToggle(this.colors, "colors", "Display classification layer colors");
-    this.context.addEventListener("change", () => { this.model.contextVisible = this.context.checked; this.changed(); }, { signal });
     this.colors.addEventListener("change", () => this.paint(), { signal });
     this.target.addEventListener("change", () => { this.model.targetLayerId = this.target.value ? Number(this.target.value) : null; this.render(); }, { signal });
     document.querySelector<HTMLInputElement>("#segment-filter")!.addEventListener("input", event => {
@@ -72,9 +69,8 @@ export class SegmentPanel {
     this.expanded.clear();
     this.filter = "";
     document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
-    this.context.checked = true;
     this.colors.checked = false;
-    this.context.disabled = this.colors.disabled = !mesh;
+    this.colors.disabled = !mesh;
     for (const id of ["segment-group-tools", "segment-layer-tools"])
       document.querySelector<HTMLFieldSetElement>(`#${id}`)!.disabled = !mesh;
     this.render();
@@ -103,7 +99,7 @@ export class SegmentPanel {
   clearSelection(): void { this.selected.clear(); this.actions.clear(); this.render(); }
 
   visibility(): Uint8Array | undefined {
-    return this.model.contextVisible && this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
+    return this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
       ? undefined : this.model.visibility();
   }
 

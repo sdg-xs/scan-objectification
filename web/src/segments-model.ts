@@ -16,7 +16,6 @@ export class SegmentCollection {
   targetLayerId: number | null = null;
   classifiedVisible = true;
   unclassifiedVisible = true;
-  contextVisible = true;
   private count = 0;
   private nextId = 1;
 
@@ -27,7 +26,6 @@ export class SegmentCollection {
     this.layers = [];
     this.targetLayerId = null;
     this.classifiedVisible = this.unclassifiedVisible = true;
-    this.contextVisible = true;
     this.nextId = 1;
   }
 
@@ -114,7 +112,7 @@ export class SegmentCollection {
   }
 
   visibility(): Uint8Array {
-    const visible = new Uint8Array(this.count).fill(Number(this.contextVisible && this.unclassifiedVisible));
+    const visible = new Uint8Array(this.count).fill(Number(this.unclassifiedVisible));
     for (const segment of this.segments) {
       const value = Number(this.isVisible(segment));
       for (const index of segment.indices) visible[index] = value;
