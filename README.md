@@ -33,7 +33,7 @@ When open, the panel extends down toward the footer even with an empty list. Its
 
 Controls use compact icons with delayed hover tooltips and accessible labels. Below Filter, the list starts with **Unclassified**, then **Root**, containing groups and layers. The symbols follow the user's open ReCap Model Browser: four shapes for Unclassified, checked shapes for Root, stacked sheets for groups, and a slanted surface for layers.
 
-1. Use the toolbar to **Add Group** or **Add Layer**. Select a group first to create a layer inside it, or choose a group in the creation dialog.
+1. Use the toolbar to **Add Group** or **Add Layer**, even before loading a scan. Select a group first to create a layer inside it, or choose a group in the creation dialog. Creation clears the filter and expands the item's parent so the result is visible. A hierarchy prepared before the first scan is retained when it loads; replacing a loaded scan resets it.
 2. Groups have an eye toggle. Each layer row has a color swatch, **Set active layer** marker and eye toggle, in that order after its name. Choosing the active layer does not move any objects.
 3. Use SAM's **Add & select checked matches** to segment/select objects; they remain in Unclassified. Assigning selected meshes to the active layer is deferred. Object rows, Target Layer, Classify/Unclassify and selection operations are currently hidden from this list; underlying model functionality is retained.
 4. Use Root, group and layer eyes to control classified visibility. Unsegmented splats follow Unclassified visibility; their separate context toggle is retained but hidden. The toolbar contains Add Group, Add Layer, Delete and, at the end, the original/classification color toggle.

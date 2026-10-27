@@ -1,5 +1,13 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Functional Model Browser creation/deletion — 2026-10-27
+
+User requested making Add Group, Add Layer and Delete functional and testing them. Regressions reproduced: creation controls/fieldsets and Delete depended on a loaded mesh; new items could be hidden by a filter; first-source reset dropped any prepared hierarchy. Controls now work independently of a scan. Creation clears the filter, expands Root/the parent group, selects the created container and opens the browser. First scan attachment preserves prepared groups/layers/active ID and unique IDs; replacement still resets the hierarchy. Blank-name errors appear inside the creation dialog. Delete cancellation/confirmation works without a scan; a stale queued close event cannot clear an immediately reopened deletion prompt.
+
+Eight new controller tests drive the real SegmentPanel event handlers against a small DOM boundary fixture, with renderer dependencies mocked and initial controls read from real viewer.html. They cover creation, filter visibility, active marker, cancellation, layer/group deletion, destination exclusion, first-scan attachment, invalid-name recovery and immediate dialog reopening. A new model test verifies preserved hierarchy/unique IDs. RED captured before fixes; frontend now has 60 passing tests. Independent review found no important correctness issues. These are automated controller tests, not real-browser interaction tests; prior local-origin browser denial still limits visual verification.
+
+Full gate passed: 70 backend tests, 60 frontend tests, typecheck and production build. Existing optional WebGPU/bundle warnings remain.
+
 ## ReCap-style layer list below Filter — 2026-10-27
 
 User requested replacing all visible content below Filter with Unclassified, then Root containing groups/layers. Target Layer, Classify/Unclassify/Clear controls, status/session notes and individual object rows are hidden from the current UI; model functionality and hidden operation bindings remain. Groups retain visibility; layer rows show name, color swatch, active-layer marker and visibility. Choosing active layer only updates the existing target ID and never assigns objects. Group reparent selector is retained hidden. Existing create/delete toolbar is unchanged. Root uses the existing classified visibility; Unclassified controls its original visibility. Filtering keeps both top rows and searches group/layer/object names.

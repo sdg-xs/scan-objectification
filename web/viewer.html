@@ -159,8 +159,8 @@
           <div class="segments-body">
             <div class="segment-panel-tools">
               <label hidden><input id="segment-context" type="checkbox" checked disabled /> Unsegmented scan context</label>
-              <button id="segment-add-group" type="button" disabled>Add Group</button>
-              <button id="segment-add-layer" type="button" disabled>Add Layer</button>
+              <button id="segment-add-group" type="button">Add Group</button>
+              <button id="segment-add-layer" type="button">Add Layer</button>
               <button id="segment-delete" type="button" disabled>Delete selected group or layer</button>
               <label class="segment-color-toggle"><input id="segment-colors" type="checkbox" disabled /> Original / classification colors</label>
             </div>
@@ -175,14 +175,15 @@
             </div>
             <dialog id="segment-create-dialog" class="segment-dialog" aria-labelledby="segment-create-title">
               <h3 id="segment-create-title">Add group or layer</h3>
+              <p id="segment-create-error" role="alert" hidden></p>
               <form id="segment-group-form">
-                <fieldset id="segment-group-tools" disabled>
+                <fieldset id="segment-group-tools">
                   <input id="segment-group-name" type="text" maxlength="80" required aria-label="New group name" placeholder="Group, e.g. Level 1" />
                   <button id="segment-new-group" type="submit">+ Group</button>
                 </fieldset>
               </form>
               <form id="segment-layer-form">
-                <fieldset id="segment-layer-tools" disabled>
+                <fieldset id="segment-layer-tools">
                   <input id="segment-layer-name" type="text" maxlength="80" required aria-label="New layer name" placeholder="Layer, e.g. Ceiling" />
                   <select id="segment-new-layer-group" aria-label="Group for new layer"><option value="">No group</option></select>
                   <button id="segment-new-layer" type="submit">+ Layer</button>

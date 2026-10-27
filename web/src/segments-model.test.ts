@@ -16,6 +16,19 @@ it("keeps SAM instances unclassified until explicitly moved to a target layer", 
   expect(scene.segments[1]!.layerId).toBeNull();
 });
 
+it("preserves prepared groups and layers when attaching the first source", () => {
+  const scene = new SegmentCollection();
+  const group = scene.createGroup("MEP");
+  const layer = scene.createLayer("Lighting", group.id);
+  scene.targetLayerId = layer.id;
+  scene.reset(3, true);
+  scene.add(new Uint8Array([1, 0, 0]), "light");
+  expect(scene.groups).toEqual([group]);
+  expect(scene.layers).toEqual([layer]);
+  expect(scene.targetLayerId).toBe(layer.id);
+  expect(new Set([group.id, layer.id, scene.segments[0]!.id]).size).toBe(3);
+});
+
 it("combines group and individual visibility without losing child states", () => {
   const scene = new SegmentCollection();
   scene.reset(4);

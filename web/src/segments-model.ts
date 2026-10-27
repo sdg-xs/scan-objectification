@@ -20,15 +20,17 @@ export class SegmentCollection {
   private count = 0;
   private nextId = 1;
 
-  reset(count: number): void {
+  reset(count: number, preserveHierarchy = false): void {
     this.count = count;
     this.segments = [];
-    this.groups = [];
-    this.layers = [];
-    this.targetLayerId = null;
+    if (!preserveHierarchy) {
+      this.groups = [];
+      this.layers = [];
+      this.targetLayerId = null;
+      this.nextId = 1;
+    }
     this.classifiedVisible = this.unclassifiedVisible = true;
     this.contextVisible = true;
-    this.nextId = 1;
   }
 
   add(labels: Uint8Array, description: string): number {

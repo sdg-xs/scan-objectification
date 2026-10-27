@@ -46,6 +46,7 @@ export class SegmentPanel {
         document.querySelector<HTMLFormElement>("#segment-group-form")!.hidden = kind !== "group";
         document.querySelector<HTMLFormElement>("#segment-layer-form")!.hidden = kind !== "layer";
         document.querySelector("#segment-create-title")!.textContent = kind === "group" ? "Add Group" : "Add Layer";
+        document.querySelector<HTMLElement>("#segment-create-error")!.hidden = true;
         if (kind === "layer" && this.container?.kind === "group")
           document.querySelector<HTMLSelectElement>("#segment-new-layer-group")!.value = String(this.container.id);
         this.createDialog.showModal();
@@ -54,7 +55,7 @@ export class SegmentPanel {
     document.querySelector("#segment-create-cancel")!.addEventListener("click", () => this.createDialog.close(), { signal });
     document.querySelector("#segment-delete")!.addEventListener("click", () => this.confirmDelete(), { signal });
     document.querySelector("#segment-delete-cancel")!.addEventListener("click", () => this.deleteDialog.close(), { signal });
-    this.deleteDialog.addEventListener("close", () => { this.deleting = undefined; }, { signal });
+    this.deleteDialog.addEventListener("close", () => { if (!this.deleteDialog.open) this.deleting = undefined; }, { signal });
     document.querySelector("#segment-delete-form")!.addEventListener("submit", event => {
       event.preventDefault();
       if (!this.deleting) return;
@@ -79,8 +80,14 @@ export class SegmentPanel {
     document.querySelector("#segment-group-form")!.addEventListener("submit", event => {
       event.preventDefault();
       const input = document.querySelector<HTMLInputElement>("#segment-group-name")!;
-      try { const group = this.model.createGroup(input.value); this.container = { kind: "group", id: group.id }; input.value = ""; this.createDialog.close(); this.render(); }
-      catch (error) { actions.error(error); }
+      try {
+        const group = this.model.createGroup(input.value);
+        this.revealContainer("group", group.id, group.id);
+        input.value = "";
+        this.createDialog.close();
+        this.render();
+      }
+      catch (error) { this.creationError(error); }
     }, { signal });
     document.querySelector("#segment-layer-form")!.addEventListener("submit", event => {
       event.preventDefault();
@@ -89,22 +96,23 @@ export class SegmentPanel {
       try {
         const layer = this.model.createLayer(input.value, group.value ? Number(group.value) : null);
         this.model.targetLayerId = layer.id;
-        this.container = { kind: "layer", id: layer.id };
+        this.revealContainer("layer", layer.id, layer.groupId);
         input.value = "";
         this.createDialog.close();
         this.render();
-      } catch (error) { actions.error(error); }
+      } catch (error) { this.creationError(error); }
     }, { signal });
     this.render();
   }
 
   setScan(mesh: SplatMesh | undefined): void {
+    const preserveHierarchy = !this.mesh && Boolean(mesh);
     this.createDialog.close();
     this.deleteDialog.close();
     this.container = undefined;
     this.release();
     this.mesh = mesh;
-    this.model.reset(mesh?.numSplats ?? 0);
+    this.model.reset(mesh?.numSplats ?? 0, preserveHierarchy);
     this.selected.clear();
     this.expanded.clear();
     this.filter = "";
@@ -114,10 +122,6 @@ export class SegmentPanel {
     this.context.disabled = !mesh;
     this.colors.closest("label")!.title = "Original colors · switch to classification colors";
     this.colors.disabled = !mesh;
-    for (const id of ["segment-add-group", "segment-add-layer"])
-      document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled = !mesh;
-    for (const id of ["segment-group-tools", "segment-layer-tools"])
-      document.querySelector<HTMLFieldSetElement>(`#${id}`)!.disabled = !mesh;
     this.render();
   }
 
@@ -150,6 +154,21 @@ export class SegmentPanel {
 
   private changed(): void { this.selected.clear(); this.actions.clear(); this.paint(); this.render(); }
 
+  private revealContainer(kind: "group" | "layer", id: number, groupId: number | null): void {
+    this.container = { kind, id };
+    this.filter = "";
+    document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
+    this.expanded.set("root", true);
+    if (groupId !== null) this.expanded.set(`group-${groupId}`, true);
+    document.querySelector<HTMLDetailsElement>("#segments-panel")!.open = true;
+  }
+
+  private creationError(error: unknown): void {
+    const message = document.querySelector<HTMLElement>("#segment-create-error")!;
+    message.textContent = error instanceof Error ? error.message : "Could not create this item.";
+    message.hidden = false;
+  }
+
   private chooseContainer(heading: HTMLElement, kind: "group" | "layer", id: number): void {
     const key = `${kind}-${id}`;
     heading.dataset.container = key;
@@ -168,7 +187,7 @@ export class SegmentPanel {
     for (const heading of this.list.querySelectorAll<HTMLElement>("[data-container]"))
       heading.classList.toggle("segment-container-selected", heading.dataset.container === key);
     const button = document.querySelector<HTMLButtonElement>("#segment-delete")!;
-    button.disabled = !this.mesh || !this.container;
+    button.disabled = !this.container;
     const item = this.container && (this.container.kind === "group" ? this.model.groups : this.model.layers).find(item => item.id === this.container?.id);
     button.title = item ? `Delete ${this.container!.kind} ${item.name}` : "Select a group or layer to delete";
     button.setAttribute("aria-label", button.title);
