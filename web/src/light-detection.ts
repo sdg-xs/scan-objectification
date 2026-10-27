@@ -30,15 +30,16 @@ export class LightDetectionControls {
   constructor(private readonly capture: () => { canvas: HTMLCanvasElement; select: (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> }, private readonly pauseViewer: (paused: boolean) => void) {
     const signal = this.events.signal;
     this.button.addEventListener("click", () => {
-      this.progress.textContent = "Describe an element and capture the current view to begin.";
-      this.dialog.showModal();
-      this.pauseViewer(true);
+      if (!this.dialog.open) this.dialog.show();
       this.prompt.focus();
     }, { signal });
     element("sam-form", HTMLFormElement).addEventListener("submit", event => { event.preventDefault(); void this.detect(); }, { signal });
     this.apply.addEventListener("click", () => void this.select(), { signal });
     this.matches.addEventListener("change", () => this.updateApply(), { signal });
     element("close-light-results", HTMLButtonElement).addEventListener("click", () => this.dialog.close(), { signal });
+    this.dialog.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.dialog.close(); }
+    }, { signal });
     this.dialog.addEventListener("close", () => {
       this.request?.abort();
       this.request = undefined;
@@ -115,6 +116,7 @@ export class LightDetectionControls {
     this.progress.textContent = `Finding “${prompt}” with local SAM 3.1…`;
     this.status.textContent = "SAM is processing the captured view…";
     try {
+      this.pauseViewer(true);
       const { canvas, select } = this.capture();
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
         value => value ? resolve(value) : reject(new Error("The view could not be captured.")), "image/png",
@@ -166,7 +168,13 @@ export class LightDetectionControls {
       if (request.signal.aborted || this.request !== request) return;
       this.report(error);
     } finally {
-      if (this.request === request) { this.request = undefined; this.stopPolling(); this.setBusy(false); this.updateApply(); }
+      if (this.request === request) {
+        this.request = undefined;
+        this.stopPolling();
+        this.pauseViewer(false);
+        this.setBusy(false);
+        this.updateApply();
+      }
     }
   }
 
@@ -178,6 +186,7 @@ export class LightDetectionControls {
     this.setBusy(true);
     this.progress.textContent = "Projecting checked masks into the scan…";
     try {
+      this.pauseViewer(true);
       const pixels = new Uint8Array(result.width * result.height);
       for (const checkbox of this.matches.querySelectorAll<HTMLInputElement>("input:checked")) {
         const mask = result.detections[Number(checkbox.value)]?.mask_png;
@@ -205,7 +214,7 @@ export class LightDetectionControls {
     } catch (error) {
       if (!request.signal.aborted) this.report(error);
     } finally {
-      if (this.request === request) { this.request = undefined; this.setBusy(false); this.updateApply(); }
+      if (this.request === request) { this.request = undefined; this.pauseViewer(false); this.setBusy(false); this.updateApply(); }
     }
   }
 

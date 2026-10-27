@@ -188,6 +188,27 @@
             <p class="segment-session-note">Temporary · stays with this loaded scan.</p>
           </div>
         </details>
+        <dialog id="light-results" class="light-dialog" aria-labelledby="light-result-title">
+          <header>
+            <div><span class="eyebrow">SAM 3.1 / LOCAL</span><h2 id="light-result-title">Detect &amp; select</h2></div>
+            <button id="close-light-results" aria-label="Close SAM workspace">Close</button>
+          </header>
+          <form id="sam-form" class="sam-prompt-form">
+            <label for="sam-prompt">Context · what should SAM find?</label>
+            <div class="sam-prompt-row">
+              <input id="sam-prompt" type="text" maxlength="240" required placeholder="e.g. linear ceiling light, round bulb" value="linear light fixture" aria-describedby="sam-capture-hint" />
+              <button id="sam-run" type="submit" class="apply">Capture &amp; detect current view</button>
+            </div>
+            <p id="sam-capture-hint" class="hint">Type a visual description, then adjust your view. Capture uses the camera at the moment you click. The viewer pauses while SAM processes it.</p>
+          </form>
+          <p id="light-result-status" role="status"></p>
+          <p id="sam-timing" class="hint" role="status"></p>
+          <ul id="light-counts" class="light-counts" aria-label="Detection counts"></ul>
+          <div id="sam-matches" class="sam-matches" aria-label="Detected elements"></div>
+          <button id="sam-select" disabled>Add &amp; select checked matches</button>
+          <div class="light-image-frame"><img id="light-result-image" alt="Captured view for object detection" /></div>
+          <p class="hint">Each checked match becomes a selected object in Model Browser → Unclassified. Choose a Target Layer and Classify it there. Projection goes through depth; use the section box to exclude splats behind the target. New objects take ownership of overlapping splats. Source files stay unchanged.</p>
+        </dialog>
         <div
           id="section-tools"
           class="section-tools"
@@ -227,27 +248,6 @@
         </div>
       </section>
     </main>
-    <dialog id="light-results" class="light-dialog" aria-labelledby="light-result-title">
-      <header>
-        <div><span class="eyebrow">SAM 3.1 / LOCAL</span><h2 id="light-result-title">Detect &amp; select elements</h2></div>
-        <button id="close-light-results" aria-label="Close SAM workspace">Close</button>
-      </header>
-      <form id="sam-form" class="sam-prompt-form">
-        <label for="sam-prompt">What should SAM find?</label>
-        <div class="sam-prompt-row">
-          <input id="sam-prompt" type="text" maxlength="240" required placeholder="e.g. rectangular air vent, red pipe, ceiling light" value="linear light fixture" />
-          <button id="sam-run" type="submit" class="apply">Capture &amp; detect</button>
-        </div>
-        <p class="hint">Describe visible objects and their appearance. Each run uses the current camera view.</p>
-      </form>
-      <p id="light-result-status" role="status"></p>
-      <p id="sam-timing" class="hint" role="status"></p>
-      <ul id="light-counts" class="light-counts" aria-label="Detection counts"></ul>
-      <div id="sam-matches" class="sam-matches" aria-label="Detected elements"></div>
-      <button id="sam-select" disabled>Add &amp; select checked matches</button>
-      <div class="light-image-frame"><img id="light-result-image" alt="Captured view for light detection" /></div>
-      <p class="hint">Each checked match becomes a selected object in Model Browser → Unclassified. Choose a Target Layer and Classify it there. Projection goes through depth; use the section box to exclude splats behind the target. New objects take ownership of overlapping splats. Source files stay unchanged.</p>
-    </dialog>
     <script type="module" src="/src/viewer.ts"></script>
   </body>
 </html>

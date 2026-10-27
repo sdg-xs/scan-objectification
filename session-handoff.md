@@ -1,5 +1,11 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Floating SAM workspace — 2026-10-27
+
+SAM now opens as a nonmodal floating window at the top-right of the model viewport. Context is focused immediately, with Capture & detect current view directly underneath. The viewer remains live for camera adjustments before capture and during result review. Each button click captures a fresh frame; there is no continuous inference. Rendering pauses only during inference/projection and resumes on completion, failure or close. Escape while focused inside the window closes it. Existing frozen-camera selection, source-revision guards and same-origin API/cloud boundary remain in place. Applying matches closes the window for classification in Model Browser. This supersedes the modal pause behavior described below.
+
+Verification: captured four failing controller tests before implementation; all five controller tests now pass, covering nonmodal opening, focus, fresh captures, failure recovery, cancellation and empty context. Full gate: 70 backend tests, 47 frontend tests, typecheck and build pass, with existing optional WebGPU/bundle warnings. The running API serves the updated viewer HTML (HTTP 200, context and current-view action present). Independent review found no important correctness issues. Visual layout remains unverified because the local browser origin access is denied.
+
 ## Warm SAM runtime and cloud boundary — 2026-10-27
 
 User approved caching the SAM model and pausing viewer rendering, and clarified that cloud processing will be used later. The worker now reuses one predictor, creates/clears frame state per request, unloads after 120 idle seconds, and clears the cache on failure or graceful shutdown. Idle timers are generation-guarded and serialized with inference. The upstream constructor's autocast is exited immediately; each request enters its own bfloat16/inference context so threadpool reuse is safe.
