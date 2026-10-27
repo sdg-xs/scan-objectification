@@ -35,7 +35,19 @@ Load a Gaussian PLY, then use **Isolate an asset** in the sidebar:
 
 Escape cancels a box drag or an in-progress selection. Replacing a model or changing scan placement clears the selection. Selection is temporary and does not edit the PLY. Original Gaussian properties, including directional color, remain intact.
 
-This is manual isolation. SAM inference, saved selections, recognition and asset export are not connected; local SAM weights are not installed.
+This is manual isolation. Saved selections and asset export remain future work.
+
+## Find lights with SAM 3.1
+
+Start the Python API alongside Vite, or use the production viewer below. The local `.venv-sam31` runtime and checkpoint are installed on this PC, separately from the application environment.
+
+1. Load a Gaussian PLY and aim the view at the ceiling. Hide BIM if it obscures the scan; the capture includes visible layers and respects the active section box.
+2. Click **Find lights in this view**. The app captures the current rendered view directly and sends one PNG to the local API.
+3. Review the frozen image with colored masks, boxes and counts for linear lights, round ceiling lights and bulbs. Categories can overlap. Close the dialog, adjust the view and repeat as needed.
+
+Inference runs on this PC using the actual SAM 3.1 checkpoint. The API on port 8767 automatically starts its worker on loopback port 8768; port 8766 is unchanged. The worker releases model state after each request. No external image service or browser credentials are used. Captures are limited to 1600 pixels on the longest edge and 50 detections per category. Closing the dialog cancels the browser's wait; an already running inference may finish before another request can begin.
+
+These are image detections, not 3D splat selections. The real API/model path passed a generated-image smoke test; detection accuracy and visual appearance on the ceiling scene still need user verification. Reload after updating the app, then select the files and re-align the view. Worker diagnostics are in `data/logs/sam31-service.log`.
 
 ## Saved scan placement
 
@@ -65,7 +77,7 @@ Open http://127.0.0.1:8767/viewer.html. The existing project shell remains at `/
 
 ## Limits and verification
 
-This milestone requires WebGL2 and loads files into browser memory. Server uploads, BIM properties, AI segmentation, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
+This milestone requires WebGL2 and loads files into browser memory. Server uploads, BIM properties, AI-driven 3D selection, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
 
 Verified in Chrome with `BS17-IFC.ifc` (24.3 MB) and `BS17-PLY.ply` (325 MB; 4,778,721 splats), including production CSP. This is not a target-PC performance benchmark. Fragments' guarded optional WebGPU code emits build warnings about exports unavailable in the WebGL Three.js entry; the tested viewer uses WebGL.
 

@@ -1,5 +1,11 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## SAM 3.1 current-view lights — 2026-10-27
+
+The user explicitly authorized adding SAM detection to the existing viewer, superseding the original Build 1 segmentation exclusion for this feature. **Find lights in this view** captures the rendered scene directly, calls same-origin `/api/local/lights`, and shows a frozen annotated image plus counts for linear, round and bulb lights. Visible layers and clipping are respected; results do not select 3D splats. The separate `.venv-sam31` worker uses the actual local SAM 3.1 checkpoint, starts automatically on 8768 and leaves 8766 alone. Application pins and CSP are unchanged.
+
+Verification: 60 backend tests, 32 frontend tests, 4 separate-runtime worker tests, 2 PLY-tool tests, typecheck and build passed. A real request through the API completed on a generated 512×512 blank image, returned model `sam3.1`, three zero-count groups and a valid overlay. Independent review found no blocking issues. Actual ceiling accuracy, captured orientation and dialog appearance remain unverified because the browser origin gate denied inspection; no alternate access bypass was used. The user can now test directly in the app after reloading, selecting models and re-aligning the view. Runtime setup, checkpoint, logs and smoke artifacts remain gitignored under `data/` and `.venv-sam31`.
+
 ## Latest milestone — 2026-10-27
 
 Completed the pending section-box rotation work on `feat/bim-gaussian-viewer`. Rotate mode uses colored rings; face resizing follows local axes. IFC planes, Spark masking and Gaussian selection share the oriented box. Reset clears rotation. The production viewer loaded the actual BS17 IFC and aligned PLY in Chrome; a tilted cut selected 3,261,847 of 4,778,721 splats without a viewer error. All 43 backend, 28 frontend and 2 PLY-tool tests pass, plus typecheck and build. Disabling the rotation math caused both rotation tests to fail; restoring it returned the frontend suite to green. Existing Fragments optional WebGPU and bundle-size build warnings remain. Unrelated staged agent/worktree and research files are outside this change.

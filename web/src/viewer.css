@@ -446,6 +446,30 @@ kbd {
   background: #a5e78424;
 }
 .asset-drawing { cursor: crosshair; }
+.light-tools h2 { margin-top: 10px; font-size: 17px; }
+.light-tools > button { width: 100%; font-size: 12px; }
+#light-status[data-error="true"] { color: #ffb5a5; }
+.light-dialog {
+  width: min(1200px, 94vw);
+  max-height: 94dvh;
+  padding: 24px;
+  border: 1px solid #52634c;
+  border-radius: 8px;
+  background: #17201e;
+  color: #e4e9e8;
+}
+.light-dialog::backdrop { background: #030a08d9; }
+.light-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.light-dialog h2 { margin-top: 8px; font-size: 22px; }
+.light-dialog > p { margin-top: 18px; }
+.light-counts { display: flex; flex-wrap: wrap; gap: 12px; padding: 0; list-style: none; font-size: 12px; }
+.light-count { padding: 6px 10px; border: 1px solid currentColor; border-radius: 4px; }
+.light-linear { color: #46dc82; }
+.light-round { color: #46a0ff; }
+.light-bulb { color: #ffbe32; }
+.light-image-frame { min-height: 80px; background: #101918; }
+.light-image-frame img { display: block; max-width: 100%; max-height: 65dvh; margin: auto; object-fit: contain; }
+.light-image-frame img:not([src]) { display: none; }
 #asset-tools { border: 0; padding: 0; margin: 12px 0; min-width: 0; }
 #asset-tools .button-row { margin-top: 9px; }
 #asset-draw[aria-pressed="true"] { background: #b7df92; color: #152416; }

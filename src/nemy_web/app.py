@@ -25,7 +25,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocketClose
 
-from nemy_web import db, projects
+from nemy_web import db, lights, projects
 from nemy_web.config import Settings
 
 # Same-origin only. `worker-src` allows the blob workers that Spark creates,
@@ -265,6 +265,7 @@ def create_pilot_app(
     """
     app = create_app(settings, dist_dir)
     app.include_router(projects.router)
+    app.include_router(lights.router)
     return app
 
 

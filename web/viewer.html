@@ -67,10 +67,17 @@
             <div class="button-row"><button id="asset-isolate" disabled>Isolate asset</button><button id="asset-clear">Clear</button></div>
           </fieldset>
           <p id="asset-status" class="hint" role="status">Load a scan to select an asset.</p>
-          <p class="hint">Manual selection · boxes select through depth. Use the section box to limit depth. SAM assistance awaits model setup.</p>
+          <p class="hint">Manual selection · boxes select through depth. Use the section box to limit depth.</p>
+        </section>
+        <section class="layer light-tools" aria-label="Light detection">
+          <span class="eyebrow">03 / LIGHTS</span>
+          <h2>Find lights in this view</h2>
+          <p class="hint">SAM 3.1 checks the visible scene for linear fixtures, round lights and bulbs. Hide the BIM if it obscures the scan.</p>
+          <button id="find-lights" class="apply" disabled>Find lights in this view</button>
+          <p id="light-status" class="hint" role="status">Load a scan, then aim the view at the lights.</p>
         </section>
         <section class="alignment">
-          <span class="eyebrow">03 / ALIGNMENT</span>
+          <span class="eyebrow">04 / ALIGNMENT</span>
           <h2>Place the scan</h2>
           <p class="hint">
             Layers start centered independently. Adjust the scan to match the
@@ -143,7 +150,7 @@
             Alignment changes last for this session.
           </p>
         </section>
-        <p class="privacy">Files stay in this browser. Nothing is uploaded.</p>
+        <p class="privacy">Models stay in this browser. Light detection sends one view to SAM 3.1 on this PC.</p>
       </aside>
       <section id="viewport" aria-label="3D model viewport">
         <div
@@ -185,6 +192,16 @@
         </div>
       </section>
     </main>
+    <dialog id="light-results" class="light-dialog" aria-labelledby="light-result-title">
+      <header>
+        <div><span class="eyebrow">SAM 3.1 / LOCAL</span><h2 id="light-result-title">Lights in captured view</h2></div>
+        <button id="close-light-results" aria-label="Close light detection results">Close</button>
+      </header>
+      <p id="light-result-status" role="status"></p>
+      <ul id="light-counts" class="light-counts" aria-label="Light counts"></ul>
+      <div class="light-image-frame"><img id="light-result-image" alt="Captured view for light detection" /></div>
+      <p class="hint">This is a frozen view. Close to adjust the camera and check another view. Masks identify visible pixels; the source scan is unchanged.</p>
+    </dialog>
     <script type="module" src="/src/viewer.ts"></script>
   </body>
 </html>

@@ -7,6 +7,8 @@ import fragmentsWorkerUrl from "@thatopen/fragments/worker?url";
 import wasmUrl from "web-ifc/web-ifc.wasm?url";
 import { SectionBox } from "./section-box";
 import { AssetSelection } from "./asset-selection";
+import { LightDetectionControls } from "./light-detection";
+import { captureSize } from "./light-detection-model";
 import {
   applyScanTransform,
   centerModel,
@@ -132,6 +134,28 @@ async function start(): Promise<void> {
     },
   });
 
+  const lights = new LightDetectionControls(() => {
+    if (!splats || !scanGroup.visible)
+      throw new Error("Show the Gaussian scan before finding lights.");
+    const capture = document.createElement("canvas");
+    const size = captureSize(renderer.domElement.width, renderer.domElement.height);
+    capture.width = size.width;
+    capture.height = size.height;
+    const context = capture.getContext("2d");
+    if (!context) throw new Error("The browser could not capture this view.");
+    const previousPlanes = renderer.clippingPlanes;
+    try {
+      renderer.clippingPlanes = section.planes;
+      // Copy in the same call as render: the WebGL drawing buffer is cleared
+      // after presentation. The section gizmos use a separate overlay scene.
+      renderer.render(scene, camera);
+      context.drawImage(renderer.domElement, 0, 0, size.width, size.height);
+    } finally {
+      renderer.clippingPlanes = previousPlanes;
+    }
+    return capture;
+  });
+
   const resize = () => {
     const { width, height } = viewport.getBoundingClientRect();
     camera.aspect = width / Math.max(height, 1);
@@ -198,6 +222,7 @@ async function start(): Promise<void> {
     plyFit.disabled = !splats;
     scanControls.disabled = !splats;
     section.setAvailable(count > 0);
+    lights.setAvailable(Boolean(splats));
     frameScene();
   }
 
@@ -414,6 +439,7 @@ async function start(): Promise<void> {
     observer.disconnect();
     renderer.setAnimationLoop(null);
     selection.dispose();
+    lights.dispose();
     controls.dispose();
     section.dispose();
     splats?.dispose();

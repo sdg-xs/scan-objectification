@@ -1,0 +1,13 @@
+# Detect lights in the current viewer
+
+The user requests SAM 3.1 inside the existing local web app, capturing the current view itself instead of requiring screenshots outside the app. The user accepts reloading and realigning the view. This extends the viewer milestone; it does not implement the parked USD upload plan.
+
+Add **Find lights in this view** beside the asset tools. With a Gaussian scan loaded, clicking it renders the current visible scene without the section-box gizmo and copies the WebGL frame synchronously into a PNG at the same aspect ratio, at most 1600 pixels per side. The capture reflects visible layers and section cuts. A modal shows that frozen view while inference runs, then an annotated image and separate counts for linear fixtures, round ceiling lights, and visible bulbs. Categories may overlap. Closing the modal cancels waiting and ignores stale results. No 3D selection or extraction is claimed.
+
+The browser posts PNG bytes to the same-origin `POST /api/local/lights`. FastAPI validates host/origin, media type, dimensions and an 8 MiB streaming body limit. It forwards only to a fixed loopback SAM 3.1 worker on port 8768, with bounded response size and validated result schema. Register the router only in `create_pilot_app()`. Preserve CSP and existing dependency pins.
+
+The worker uses the already installed `.venv-sam31`, source checkout and local 3.1 checkpoint under `data/sam31`. It never downloads models or reads credentials during detection. Start it automatically on demand when the app can find this runtime. Bind only to loopback, reject browser-origin requests, serialize GPU work, validate decoded PNGs, limit results to 50 instances per category, and return a labeled PNG plus normalized boxes and scores. Release GPU model state after each request so it does not permanently occupy the viewer's GPU memory. Keep user images in temporary storage only for the request and do not log them.
+
+The tested upstream source needs its `offload_state_to_cpu` wrapper incompatibility handled explicitly. Do not depend silently on an uncommitted source patch: the worker's integration must support the actual model signature. Failures must be visible and permit retry. Keep app and SAM environments separate because their NumPy requirements conflict.
+
+Verification: meaningful backend request/proxy/security tests, frontend capture-size and response-validation tests, worker tests using a deterministic fake engine plus a real SAM 3.1 smoke request through the full HTTP route. Run the full existing release gate. Browser automation remains subject to its saved permission gate; the new feature is operated by the user's own button click and does not bypass that gate.
