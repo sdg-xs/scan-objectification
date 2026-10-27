@@ -12,6 +12,11 @@ export class SegmentPanel {
   private readonly status = document.querySelector<HTMLParagraphElement>("#segment-status")!;
   private readonly target = document.querySelector<HTMLSelectElement>("#segment-target")!;
   private readonly colors = document.querySelector<HTMLInputElement>("#segment-colors")!;
+  private readonly context = document.querySelector<HTMLInputElement>("#segment-context")!;
+  private readonly createDialog = document.querySelector<HTMLDialogElement>("#segment-create-dialog")!;
+  private readonly deleteDialog = document.querySelector<HTMLDialogElement>("#segment-delete-dialog")!;
+  private container: { kind: "group" | "layer"; id: number } | undefined;
+  private deleting: { kind: "group" | "layer"; id: number } | undefined;
   private readonly events = new AbortController();
   private readonly selected = new Set<number>();
   private readonly expanded = new Map<string, boolean>();
@@ -26,11 +31,41 @@ export class SegmentPanel {
       ["segment-classify", "classify", "Classify selected objects into the Target Layer"],
       ["segment-unclassify", "unclassify", "Unclassify selected objects"],
       ["segment-clear-highlight", "clear", "Clear selection"],
-      ["segment-new-group", "group", "Create a group"],
-      ["segment-new-layer", "layer", "Create a layer and set it as Target Layer"],
+      ["segment-add-group", "group", "Add Group"],
+      ["segment-add-layer", "layer", "Add Layer"],
+      ["segment-delete", "remove", "Delete selected group or layer"],
     ] as const) classificationButton(document.querySelector<HTMLButtonElement>(`#${id}`)!, icon, label);
-    classificationToggle(this.colors, "colors", "Display classification layer colors");
-    this.colors.addEventListener("change", () => this.paint(), { signal });
+    classificationToggle(this.colors, "colors", "Display classification colors (off: original colors)");
+    this.context.addEventListener("change", () => { this.model.contextVisible = this.context.checked; this.changed(); }, { signal });
+    this.colors.addEventListener("change", () => {
+      this.colors.closest("label")!.title = this.colors.checked ? "Classification colors · switch to original colors" : "Original colors · switch to classification colors";
+      this.paint();
+    }, { signal });
+    for (const kind of ["group", "layer"] as const)
+      document.querySelector(`#segment-add-${kind}`)!.addEventListener("click", () => {
+        document.querySelector<HTMLFormElement>("#segment-group-form")!.hidden = kind !== "group";
+        document.querySelector<HTMLFormElement>("#segment-layer-form")!.hidden = kind !== "layer";
+        document.querySelector("#segment-create-title")!.textContent = kind === "group" ? "Add Group" : "Add Layer";
+        if (kind === "layer" && this.container?.kind === "group")
+          document.querySelector<HTMLSelectElement>("#segment-new-layer-group")!.value = String(this.container.id);
+        this.createDialog.showModal();
+        document.querySelector<HTMLInputElement>(`#segment-${kind}-name`)!.focus();
+      }, { signal });
+    document.querySelector("#segment-create-cancel")!.addEventListener("click", () => this.createDialog.close(), { signal });
+    document.querySelector("#segment-delete")!.addEventListener("click", () => this.confirmDelete(), { signal });
+    document.querySelector("#segment-delete-cancel")!.addEventListener("click", () => this.deleteDialog.close(), { signal });
+    this.deleteDialog.addEventListener("close", () => { this.deleting = undefined; }, { signal });
+    document.querySelector("#segment-delete-form")!.addEventListener("submit", event => {
+      event.preventDefault();
+      if (!this.deleting) return;
+      const destination = document.querySelector<HTMLSelectElement>("#segment-delete-destination")!.value;
+      try {
+        this.model.deleteContainer(this.deleting.kind, this.deleting.id, destination ? Number(destination) : null);
+        this.container = undefined;
+        this.deleteDialog.close();
+        this.changed();
+      } catch (error) { actions.error(error); }
+    }, { signal });
     this.target.addEventListener("change", () => { this.model.targetLayerId = this.target.value ? Number(this.target.value) : null; this.render(); }, { signal });
     document.querySelector<HTMLInputElement>("#segment-filter")!.addEventListener("input", event => {
       if (event.target instanceof HTMLInputElement) { this.filter = event.target.value.toLocaleLowerCase(); this.render(); }
@@ -44,7 +79,7 @@ export class SegmentPanel {
     document.querySelector("#segment-group-form")!.addEventListener("submit", event => {
       event.preventDefault();
       const input = document.querySelector<HTMLInputElement>("#segment-group-name")!;
-      try { this.model.createGroup(input.value); input.value = ""; this.render(); }
+      try { const group = this.model.createGroup(input.value); this.container = { kind: "group", id: group.id }; input.value = ""; this.createDialog.close(); this.render(); }
       catch (error) { actions.error(error); }
     }, { signal });
     document.querySelector("#segment-layer-form")!.addEventListener("submit", event => {
@@ -54,7 +89,9 @@ export class SegmentPanel {
       try {
         const layer = this.model.createLayer(input.value, group.value ? Number(group.value) : null);
         this.model.targetLayerId = layer.id;
+        this.container = { kind: "layer", id: layer.id };
         input.value = "";
+        this.createDialog.close();
         this.render();
       } catch (error) { actions.error(error); }
     }, { signal });
@@ -62,6 +99,9 @@ export class SegmentPanel {
   }
 
   setScan(mesh: SplatMesh | undefined): void {
+    this.createDialog.close();
+    this.deleteDialog.close();
+    this.container = undefined;
     this.release();
     this.mesh = mesh;
     this.model.reset(mesh?.numSplats ?? 0);
@@ -70,7 +110,12 @@ export class SegmentPanel {
     this.filter = "";
     document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
     this.colors.checked = false;
+    this.context.checked = true;
+    this.context.disabled = !mesh;
+    this.colors.closest("label")!.title = "Original colors · switch to classification colors";
     this.colors.disabled = !mesh;
+    for (const id of ["segment-add-group", "segment-add-layer"])
+      document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled = !mesh;
     for (const id of ["segment-group-tools", "segment-layer-tools"])
       document.querySelector<HTMLFieldSetElement>(`#${id}`)!.disabled = !mesh;
     this.render();
@@ -99,11 +144,56 @@ export class SegmentPanel {
   clearSelection(): void { this.selected.clear(); this.actions.clear(); this.render(); }
 
   visibility(): Uint8Array | undefined {
-    return this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
+    return this.model.contextVisible && this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
       ? undefined : this.model.visibility();
   }
 
   private changed(): void { this.selected.clear(); this.actions.clear(); this.paint(); this.render(); }
+
+  private chooseContainer(heading: HTMLElement, kind: "group" | "layer", id: number): void {
+    const key = `${kind}-${id}`;
+    heading.dataset.container = key;
+    heading.addEventListener("click", () => {
+      this.container = { kind, id };
+      this.markContainer();
+    });
+    heading.addEventListener("focusin", () => {
+      this.container = { kind, id };
+      this.markContainer();
+    });
+  }
+
+  private markContainer(): void {
+    const key = this.container ? `${this.container.kind}-${this.container.id}` : "";
+    for (const heading of this.list.querySelectorAll<HTMLElement>("[data-container]"))
+      heading.classList.toggle("segment-container-selected", heading.dataset.container === key);
+    const button = document.querySelector<HTMLButtonElement>("#segment-delete")!;
+    button.disabled = !this.mesh || !this.container;
+    const item = this.container && (this.container.kind === "group" ? this.model.groups : this.model.layers).find(item => item.id === this.container?.id);
+    button.title = item ? `Delete ${this.container!.kind} ${item.name}` : "Select a group or layer to delete";
+    button.setAttribute("aria-label", button.title);
+  }
+
+  private confirmDelete(): void {
+    const container = this.container;
+    if (!container) return;
+    const item = (container.kind === "group" ? this.model.groups : this.model.layers).find(item => item.id === container.id);
+    if (!item) return;
+    const layers = this.model.layers.filter(layer => container.kind === "group" ? layer.groupId === container.id : layer.id === container.id);
+    const ids = new Set(layers.map(layer => layer.id));
+    const count = this.model.segments.filter(segment => segment.layerId !== null && ids.has(segment.layerId)).length;
+    const destination = document.querySelector<HTMLSelectElement>("#segment-delete-destination")!;
+    destination.replaceChildren(new Option("Unassign to Unclassified", ""));
+    for (const layer of this.model.layers) if (!ids.has(layer.id)) {
+      const group = this.model.groups.find(group => group.id === layer.groupId);
+      destination.add(new Option(`Assign to ${group ? `${group.name} / ` : ""}${layer.name}`, String(layer.id)));
+    }
+    document.querySelector("#segment-delete-title")!.textContent = `Delete ${container.kind} “${item.name}”?`;
+    document.querySelector("#segment-delete-description")!.textContent = `${count} objects will be preserved. ${container.kind === "group" ? `This also removes ${layers.length} layers in this group. ` : ""}Choose where the contained elements should go.`;
+    this.deleting = container;
+    this.deleteDialog.showModal();
+    destination.focus();
+  }
 
   private highlight(): void {
     const items = this.model.segments.filter(segment => this.selected.has(segment.id));
@@ -203,8 +293,8 @@ export class SegmentPanel {
     color.addEventListener("input", () => { layer.color = color.value; this.paint(); });
     const target = this.button("target", `Set target layer ${layer.name}`, () => { this.model.targetLayerId = layer.id; this.render(); });
     target.setAttribute("aria-pressed", String(this.model.targetLayerId === layer.id));
-    tree.heading.replaceChildren(color, name, target, this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }),
-      this.button("remove", `Remove layer ${layer.name}; keep its objects unclassified`, () => { this.model.removeLayer(layer.id); this.changed(); }));
+    tree.heading.replaceChildren(color, name, target, this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }));
+    this.chooseContainer(tree.heading, "layer", layer.id);
     const group = document.createElement("select");
     group.className = "segment-layer-group";
     group.setAttribute("aria-label", `Group of layer ${layer.name}`);
@@ -221,8 +311,8 @@ export class SegmentPanel {
   private group(group: SegmentGroup): HTMLElement {
     const tree = this.tree("", `group-${group.id}`);
     tree.heading.replaceChildren(classificationIcon("folder"), this.name(group.name, `Group name ${group.name}`, value => { group.name = value; }),
-      this.eye(`group ${group.name}`, group.visible, visible => { group.visible = visible; }),
-      this.button("remove", `Remove group ${group.name}; keep its layers`, () => { this.model.removeGroup(group.id); this.changed(); }));
+      this.eye(`group ${group.name}`, group.visible, visible => { group.visible = visible; }));
+    this.chooseContainer(tree.heading, "group", group.id);
     for (const layer of this.model.layers) if (layer.groupId === group.id && this.matchesLayer(layer)) tree.element.append(this.layer(layer));
     return tree.element;
   }
@@ -268,6 +358,7 @@ export class SegmentPanel {
       if (group.name.toLocaleLowerCase().includes(this.filter) || this.model.layers.some(layer => layer.groupId === group.id && this.matchesLayer(layer))) classified.element.append(this.group(group));
     for (const layer of this.model.layers) if (layer.groupId === null && this.matchesLayer(layer)) classified.element.append(this.layer(layer));
     this.list.append(unclassified.element, classified.element);
+    this.markContainer();
   }
 
   private paint(): void {
@@ -316,5 +407,5 @@ export class SegmentPanel {
     this.modifier = undefined;
   }
 
-  dispose(): void { this.events.abort(); this.release(); }
+  dispose(): void { this.createDialog.close(); this.deleteDialog.close(); this.events.abort(); this.release(); }
 }

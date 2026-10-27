@@ -52,7 +52,7 @@ function status(id: string, text: string, failed = false): void {
 async function start(): Promise<void> {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-  renderer.setClearColor(0x101918);
+  renderer.setClearColor(0x000000);
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute(
     "aria-label",

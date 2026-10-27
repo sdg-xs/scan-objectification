@@ -1,5 +1,13 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Model Browser toolbar and reference theme — 2026-10-27
+
+The user clarified that unsegmented-context functionality should be retained, only hidden. Restored `contextVisible`, its reset/binding and the context checkbox under a hidden label. Toolbar order is Add Group, Add Layer, Delete, then original/classification color toggle, using icons and tooltips. Creation uses dialogs. Click or keyboard-focus a group/layer heading to select the Delete target. Confirmation preserves objects and offers Unclassified or another surviving layer. Group deletion explicitly removes its layers; no destination inside the deletion is allowed. Legacy model removeGroup/removeLayer methods and object removal remain available. Target-layer and object selection behavior are retained.
+
+Viewer colors/fonts follow the user's local `asset.library`: local Poppins weights 400–800, white panels, navy header and blue accents. Theme overrides contain no layout changes. User then requested a black model field; viewport background and renderer clear color are black. Browser visual inspection remains unavailable under the existing origin denial.
+
+Verification: model tests captured RED before restoration/deletion implementation; full gate passes with 70 backend tests, 51 frontend tests, typecheck and production build. Existing optional WebGPU/bundle warnings remain. All five copied font files match the reference hashes, and the API serves Poppins with HTTP 200. Independent review found no important correctness issues.
+
 ## Floating SAM workspace — 2026-10-27
 
 SAM now opens as a nonmodal floating window at the top-right of the model viewport. Context is focused immediately, with Capture & detect current view directly underneath. The viewer remains live for camera adjustments before capture and during result review. Each button click captures a fresh frame; there is no continuous inference. Rendering pauses only during inference/projection and resumes on completion, failure or close. Escape while focused inside the window closes it. Existing frozen-camera selection, source-revision guards and same-origin API/cloud boundary remain in place. Applying matches closes the window for classification in Model Browser. This supersedes the modal pause behavior described below.

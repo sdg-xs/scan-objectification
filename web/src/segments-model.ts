@@ -16,6 +16,7 @@ export class SegmentCollection {
   targetLayerId: number | null = null;
   classifiedVisible = true;
   unclassifiedVisible = true;
+  contextVisible = true;
   private count = 0;
   private nextId = 1;
 
@@ -26,6 +27,7 @@ export class SegmentCollection {
     this.layers = [];
     this.targetLayerId = null;
     this.classifiedVisible = this.unclassifiedVisible = true;
+    this.contextVisible = true;
     this.nextId = 1;
   }
 
@@ -104,6 +106,19 @@ export class SegmentCollection {
     for (const layer of this.layers) if (layer.groupId === id) layer.groupId = null;
   }
 
+  deleteContainer(kind: "group" | "layer", id: number, destination: number | null): void {
+    if (!(kind === "group" ? this.groups : this.layers).some(item => item.id === id))
+      throw new Error("This group or layer no longer exists.");
+    const removed = new Set(this.layers.filter(layer => kind === "group" ? layer.groupId === id : layer.id === id).map(layer => layer.id));
+    if (destination !== null && (removed.has(destination) || !this.layers.some(layer => layer.id === destination)))
+      throw new Error("Choose a destination layer outside the deleted group or layer.");
+    for (const segment of this.segments)
+      if (segment.layerId !== null && removed.has(segment.layerId)) segment.layerId = destination;
+    this.layers = this.layers.filter(layer => !removed.has(layer.id));
+    if (kind === "group") this.groups = this.groups.filter(group => group.id !== id);
+    if (this.targetLayerId !== null && removed.has(this.targetLayerId)) this.targetLayerId = null;
+  }
+
   isVisible(segment: Segment): boolean {
     if (!segment.visible) return false;
     if (segment.layerId === null) return this.unclassifiedVisible;
@@ -112,7 +127,7 @@ export class SegmentCollection {
   }
 
   visibility(): Uint8Array {
-    const visible = new Uint8Array(this.count).fill(Number(this.unclassifiedVisible));
+    const visible = new Uint8Array(this.count).fill(Number(this.contextVisible && this.unclassifiedVisible));
     for (const segment of this.segments) {
       const value = Number(this.isVisible(segment));
       for (const index of segment.indices) visible[index] = value;

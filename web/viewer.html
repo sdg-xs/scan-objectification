@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nemy — BIM + Gaussian viewer</title>
     <link rel="stylesheet" href="/src/viewer.css" />
+    <link rel="stylesheet" href="/src/viewer-theme.css" />
   </head>
   <body>
     <header class="topbar">
@@ -157,7 +158,11 @@
           <summary><span>Model Browser</span><span id="segment-count" class="segment-count">0</span></summary>
           <div class="segments-body">
             <div class="segment-panel-tools">
-              <label><input id="segment-colors" type="checkbox" disabled /> Layer colors</label>
+              <label hidden><input id="segment-context" type="checkbox" checked disabled /> Unsegmented scan context</label>
+              <button id="segment-add-group" type="button" disabled>Add Group</button>
+              <button id="segment-add-layer" type="button" disabled>Add Layer</button>
+              <button id="segment-delete" type="button" disabled>Delete selected group or layer</button>
+              <label class="segment-color-toggle"><input id="segment-colors" type="checkbox" disabled /> Original / classification colors</label>
             </div>
             <input id="segment-filter" type="search" aria-label="Filter Model Browser" placeholder="Filter objects, layers and groups" />
             <label class="segment-target-label">Target Layer<select id="segment-target" title="Choose the classification target layer" disabled><option value="">Choose target layer…</option></select></label>
@@ -166,8 +171,8 @@
               <button id="segment-unclassify" type="button" disabled>Unclassify</button>
               <button id="segment-clear-highlight" type="button">Clear selection</button>
             </div>
-            <details class="segment-create">
-              <summary>New layer / group</summary>
+            <dialog id="segment-create-dialog" class="segment-dialog" aria-labelledby="segment-create-title">
+              <h3 id="segment-create-title">Add group or layer</h3>
               <form id="segment-group-form">
                 <fieldset id="segment-group-tools" disabled>
                   <input id="segment-group-name" type="text" maxlength="80" required aria-label="New group name" placeholder="Group, e.g. Level 1" />
@@ -181,7 +186,20 @@
                   <button id="segment-new-layer" type="submit">+ Layer</button>
                 </fieldset>
               </form>
-            </details>
+              <button id="segment-create-cancel" type="button">Cancel</button>
+            </dialog>
+            <dialog id="segment-delete-dialog" class="segment-dialog" aria-labelledby="segment-delete-title">
+              <form id="segment-delete-form">
+                <h3 id="segment-delete-title">Delete group or layer</h3>
+                <p id="segment-delete-description"></p>
+                <label for="segment-delete-destination">Preserve contained elements by</label>
+                <select id="segment-delete-destination"><option value="">Unassigning to Unclassified</option></select>
+                <div class="segment-delete-actions">
+                  <button type="submit">Delete</button>
+                  <button id="segment-delete-cancel" type="button">Cancel</button>
+                </div>
+              </form>
+            </dialog>
             <p id="segment-status" class="hint" role="status">Use SAM to segment and select elements, then choose a Target Layer.</p>
             <div id="segment-list"></div>
             <p class="segment-session-note">Temporary · stays with this loaded scan.</p>

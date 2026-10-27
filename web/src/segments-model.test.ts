@@ -32,8 +32,71 @@ it("combines group and individual visibility without losing child states", () =>
   layer.visible = false;
   expect([...scene.visibility()]).toEqual([0, 0, 1, 1]);
   layer.visible = true;
-  scene.unclassifiedVisible = false;
+  scene.contextVisible = false;
   expect([...scene.visibility()]).toEqual([0, 1, 0, 0]);
+});
+
+it("deletes a layer while moving its objects to another layer", () => {
+  const scene = new SegmentCollection();
+  scene.reset(3);
+  scene.add(new Uint8Array([1, 0, 0]), "light");
+  const source = scene.createLayer("Old");
+  const destination = scene.createLayer("Lighting");
+  scene.targetLayerId = source.id;
+  scene.classify(scene.segments.map(item => item.id));
+  scene.deleteContainer("layer", source.id, destination.id);
+  expect(scene.layers).toEqual([destination]);
+  expect(scene.segments[0]!.layerId).toBe(destination.id);
+  expect([...scene.segments[0]!.indices]).toEqual([0]);
+  expect(scene.targetLayerId).toBeNull();
+});
+
+it("deletes a group and its layers while keeping all objects unassigned", () => {
+  const scene = new SegmentCollection();
+  scene.reset(2);
+  scene.add(new Uint8Array([1, 2]), "light");
+  const group = scene.createGroup("Old group");
+  const a = scene.createLayer("A", group.id);
+  const b = scene.createLayer("B", group.id);
+  scene.targetLayerId = a.id;
+  scene.classify([scene.segments[0]!.id]);
+  scene.targetLayerId = b.id;
+  scene.classify([scene.segments[1]!.id]);
+  scene.deleteContainer("group", group.id, null);
+  expect(scene.groups).toEqual([]);
+  expect(scene.layers).toEqual([]);
+  expect(scene.segments.map(item => item.layerId)).toEqual([null, null]);
+  expect([...scene.visibility()]).toEqual([1, 1]);
+});
+
+it("rejects a destination inside a deleted group without changing anything", () => {
+  const scene = new SegmentCollection();
+  const group = scene.createGroup("Group");
+  const layer = scene.createLayer("Layer", group.id);
+  expect(() => scene.deleteContainer("group", group.id, layer.id)).toThrow();
+  expect(scene.groups).toEqual([group]);
+  expect(scene.layers).toEqual([layer]);
+  expect(() => scene.deleteContainer("layer", layer.id, 999)).toThrow();
+  expect(() => scene.deleteContainer("layer", 999, null)).toThrow();
+});
+
+it("moves every object from a deleted group and preserves unrelated layers", () => {
+  const scene = new SegmentCollection();
+  scene.reset(3);
+  scene.add(new Uint8Array([1, 2, 3]), "fixture");
+  const group = scene.createGroup("Old");
+  const a = scene.createLayer("A", group.id);
+  const b = scene.createLayer("B", group.id);
+  const destination = scene.createLayer("Keep");
+  for (const [index, layer] of [a, b, destination].entries()) {
+    scene.targetLayerId = layer.id;
+    scene.classify([scene.segments[index]!.id]);
+  }
+  scene.deleteContainer("group", group.id, destination.id);
+  expect(scene.layers).toEqual([destination]);
+  expect(scene.segments.map(item => item.layerId)).toEqual([destination.id, destination.id, destination.id]);
+  expect(scene.targetLayerId).toBe(destination.id);
+  expect(scene.segments.map(item => [...item.indices])).toEqual([[0], [1], [2]]);
 });
 
 it("assigns overlapping splats only to the newest segment and restores context on removal", () => {

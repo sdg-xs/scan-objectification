@@ -576,5 +576,14 @@ kbd {
 .classification-toggle:has(input:disabled) { opacity: .45; cursor: default; }
 .classification-visibility input:checked ~ .icon-hidden, .classification-visibility input:not(:checked) ~ .icon-visible { display: none; }
 .segment-panel-tools { justify-content: flex-start; }
+.segment-panel-tools .segment-color-toggle { margin-left: auto; }
+.segment-tree > summary.segment-container-selected { background: #314c37; box-shadow: inset 2px 0 var(--accent); }
+.segment-dialog { width: min(360px, calc(100vw - 40px)); padding: 20px; border: 1px solid #52634c; border-radius: 6px; color: #e4e9e8; background: #17221f; }
+.segment-dialog::backdrop { background: #030a08a8; }
+.segment-dialog h3 { margin: 0 0 16px; }
+.segment-dialog p { margin-bottom: 14px; line-height: 1.5; }
+.segment-dialog label { display: block; margin-bottom: 8px; }
+.segment-delete-actions { display: flex; gap: 8px; margin-top: 16px; }
+.segment-delete-actions button[type="submit"] { border-color: #db9987; }
 .segment-operations { justify-content: flex-start; }
 [hidden] { display: none !important; }
