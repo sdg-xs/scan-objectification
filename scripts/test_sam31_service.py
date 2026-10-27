@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi.testclient import TestClient
 import numpy as np
+import pytest
 from PIL import Image
 
 from sam31_service import create_worker, SamEngine
@@ -46,7 +47,18 @@ def test_engine_reuses_model_resets_frames_and_releases_after_idle(monkeypatch, 
         assert list(engine.detect(tmp_path / "view.png", "pipe")) == [("custom", {"ok": True})]
         assert engine.model_loaded
         assert engine.last_timings["reused_model"] is False
-        assert list(engine.detect(tmp_path / "view.png", "light")) == [("custom", {"ok": True})]
+        outputs = []
+        failures = []
+        def second_request():
+            try:
+                outputs.extend(engine.detect(tmp_path / "view.png", "light"))
+            except BaseException as error:
+                failures.append(error)
+        thread = threading.Thread(target=second_request)
+        thread.start()
+        thread.join(timeout=3)
+        assert not thread.is_alive() and not failures
+        assert outputs == [("custom", {"ok": True})]
         assert len(built) == 1
         assert states == [{}, {}]
         assert engine.last_timings["reused_model"] is True
@@ -57,6 +69,18 @@ def test_engine_reuses_model_resets_frames_and_releases_after_idle(monkeypatch, 
         monkeypatch.setattr(engine, "_drop_predictor", drop)
         assert evicted.wait(3)
         assert not engine.model_loaded
+        list(engine.detect(tmp_path / "view.png", "pipe"))
+        assert len(built) == 2
+        engine._expire(engine._generation - 1)
+        assert engine.model_loaded
+        def fail(**kwargs):
+            raise RuntimeError("inference failure")
+        built[-1].model.add_prompt = fail
+        with pytest.raises(RuntimeError, match="inference failure"):
+            list(engine.detect(tmp_path / "view.png", "pipe"))
+        assert not engine.model_loaded
+        list(engine.detect(tmp_path / "view.png", "pipe"))
+        assert len(built) == 3
     finally:
         engine.close()
 
@@ -65,6 +89,23 @@ def capture():
     buffer = io.BytesIO()
     Image.new("RGB", (16, 12), "black").save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+def test_health_distinguishes_a_live_busy_worker_from_an_idle_worker(tmp_path):
+    engine = Engine()
+    engine.phase = "detecting"
+    engine.model_loaded = True
+    app = create_worker(tmp_path, engine)
+    with TestClient(app, base_url="http://127.0.0.1:8768") as client:
+        app.state.inference_lock.acquire()
+        try:
+            status = client.get("/health").json()
+            assert status["busy"] is True
+            assert status["phase"] == "detecting"
+            assert status["model_loaded"] is True
+        finally:
+            app.state.inference_lock.release()
+        assert client.get("/health").json()["phase"] == "idle"
 
 
 class Engine:

@@ -270,6 +270,7 @@ def create_worker(runtime: Path, engine=None) -> FastAPI:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime", type=Path, default=Path("data/sam31"))
     args = parser.parse_args()
