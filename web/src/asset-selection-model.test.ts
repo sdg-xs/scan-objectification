@@ -8,6 +8,26 @@ camera.updateMatrixWorld();
 const projection = new Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
 const base = { count: 3, center: (i: number) => points[i]!.clone(), world: new Matrix4() };
 
+it("selects SAM mask pixels in top-left coordinates, with depth and section limits", async () => {
+  const pixels = new Uint8Array(16);
+  pixels[2 * 4 + 2] = 1;
+  const result = await selectAsset({ ...base, previous: new Uint8Array(3), operation: "replace", projection,
+    screenMask: { width: 4, height: 4, pixels } });
+  expect([...result.mask]).toEqual([1, 0, 0]);
+  const clipped = await selectAsset({ ...base, previous: new Uint8Array(3), operation: "replace", projection,
+    screenMask: { width: 4, height: 4, pixels }, region: new Box3(new Vector3(10, 10, 10), new Vector3(11, 11, 11)) });
+  expect(clipped.count).toBe(0);
+});
+
+it("maps the upper image rows to positive camera Y", async () => {
+  const pixels = new Uint8Array(16);
+  pixels[2] = 1;
+  const positions = [new Vector3(0, 2, -5), new Vector3(0, -2, -5)];
+  const result = await selectAsset({ count: 2, center: i => positions[i]!.clone(), world: new Matrix4(),
+    previous: new Uint8Array(2), operation: "replace", projection, screenMask: { width: 4, height: 4, pixels } });
+  expect([...result.mask]).toEqual([1, 0]);
+});
+
 it("selects source IDs inside the screen box, rejecting points behind the camera", async () => {
   const result = await selectAsset({ ...base, previous: new Uint8Array(3), operation: "replace", projection, rectangle: [-0.2, -0.2, 0.2, 0.2] });
   expect([...result.mask]).toEqual([1, 0, 0]);

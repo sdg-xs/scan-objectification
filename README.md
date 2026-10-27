@@ -37,17 +37,18 @@ Escape cancels a box drag or an in-progress selection. Replacing a model or chan
 
 This is manual isolation. Saved selections and asset export remain future work.
 
-## Find lights with SAM 3.1
+## Detect and select elements with SAM 3.1
 
 Start the Python API alongside Vite, or use the production viewer below. The local `.venv-sam31` runtime and checkpoint are installed on this PC, separately from the application environment.
 
-1. Load a Gaussian PLY and aim the view at the ceiling. Hide BIM if it obscures the scan; the capture includes visible layers and respects the active section box.
-2. Click **Find lights in this view**. The app captures the current rendered view directly and sends one PNG to the local API.
-3. Review the frozen image with colored masks, boxes and counts for linear lights, round ceiling lights and bulbs. Categories can overlap. Close the dialog, adjust the view and repeat as needed.
+1. Load a Gaussian PLY and aim at the elements you need. Hide BIM if it obscures the scan; the capture includes visible layers and respects the active section box.
+2. Click **Open SAM workspace**. Enter a visual description such as `rectangular air vent`, `red pipe` or `ceiling light`, then click **Capture & detect**. SAM matches visible appearance; the field is not a conversational instruction box. Descriptions are limited to 240 characters.
+3. Review the frozen image and numbered matches. Uncheck unwanted matches and click **Replace scan selection with checked matches** to preview them in green. Use **Isolate asset** or the existing manual add/remove tools to refine the result. Selection remains temporary.
+4. Close the window to adjust the view and repeat. Each run captures the current view; selection uses the camera and section box saved with that capture. Changed scan placement or a changed selection requires a fresh capture.
 
-Inference runs on this PC using the actual SAM 3.1 checkpoint. The API on port 8767 automatically starts its worker on loopback port 8768; port 8766 is unchanged. The worker releases model state after each request. No external image service or browser credentials are used. Captures are limited to 1600 pixels on the longest edge and 50 detections per category. Closing the dialog cancels the browser's wait; an already running inference may finish before another request can begin.
+Inference runs on this PC using the actual SAM 3.1 checkpoint. The API on port 8767 automatically starts its worker on loopback port 8768; port 8766 is unchanged. The worker releases model state after each request. No external image service or browser credentials are used. Captures are limited to 1600 pixels on the longest edge and 50 detections per prompt. Closing the dialog cancels the browser's wait; an already running inference may finish before another request can begin.
 
-These are image detections, not 3D splat selections. The real API/model path passed a generated-image smoke test; detection accuracy and visual appearance on the ceiling scene still need user verification. Reload after updating the app, then select the files and re-align the view. Worker diagnostics are in `data/logs/sam31-service.log`.
+Selection projects splat centers into the chosen image masks through depth, so hidden splats behind an object can also be selected. Limit depth with the section box and refine manually. This does not reconstruct a complete 3D object or export an asset. The real API/model path passed a generated-image smoke test; arbitrary-object accuracy and visual alignment still need user verification. Reload after updating the app, then select the files and re-align the view. Restart the API and its worker when their code changes. Worker diagnostics are in `data/logs/sam31-service.log`.
 
 ## Saved scan placement
 
@@ -77,7 +78,7 @@ Open http://127.0.0.1:8767/viewer.html. The existing project shell remains at `/
 
 ## Limits and verification
 
-This milestone requires WebGL2 and loads files into browser memory. Server uploads, BIM properties, AI-driven 3D selection, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
+This milestone requires WebGL2 and loads files into browser memory. Server uploads, BIM properties, depth-resolved object extraction, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
 
 Verified in Chrome with `BS17-IFC.ifc` (24.3 MB) and `BS17-PLY.ply` (325 MB; 4,778,721 splats), including production CSP. This is not a target-PC performance benchmark. Fragments' guarded optional WebGPU code emits build warnings about exports unavailable in the WebGL Three.js entry; the tested viewer uses WebGL.
 

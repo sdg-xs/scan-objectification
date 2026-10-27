@@ -29,6 +29,24 @@ class Engine:
             yield kind, {"out_binary_masks": mask, "out_probs": np.array([0.9]), "out_boxes_xywh": np.array([[0.25, 0.25, 0.3125, 0.25]])}
 
 
+def test_custom_prompt_reaches_engine_and_returns_individual_mask(tmp_path):
+    class CustomEngine(Engine):
+        def detect(self, path, prompt):
+            self.prompt = prompt
+            _, output = next(super().detect(path))
+            yield "custom", output
+    engine = CustomEngine()
+    with TestClient(create_worker(tmp_path, engine), base_url="http://127.0.0.1:8768") as client:
+        response = client.post("/lights", content=capture(), headers={"Content-Type": "image/png", "X-SAM-Prompt": "red%20pipe"})
+    assert response.status_code == 200
+    assert engine.prompt == "red pipe"
+    result = response.json()
+    assert result["prompt"] == "red pipe"
+    mask = Image.open(io.BytesIO(base64.b64decode(result["groups"][0]["detections"][0]["mask_png"])))
+    assert mask.getpixel((5, 4)) == 255
+    assert mask.getpixel((0, 0)) == 0
+
+
 def test_worker_draws_masks_boxes_and_cleans_up_capture(tmp_path):
     engine = Engine()
     app = create_worker(tmp_path, engine=engine)

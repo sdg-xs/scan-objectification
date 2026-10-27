@@ -23,7 +23,7 @@ def result():
 
 
 @contextmanager
-def worker(monkeypatch, payload=None, status=200):
+def worker(monkeypatch, payload=None, status=200, prompt=None):
     from nemy_web import lights
 
     received = []
@@ -38,6 +38,8 @@ def worker(monkeypatch, payload=None, status=200):
             self.wfile.write(b'{"model":"sam3.1","status":"ready"}')
 
         def do_POST(self):
+            if prompt is not None:
+                assert self.headers["X-SAM-Prompt"] == prompt
             received.append((self.path, self.rfile.read(int(self.headers["Content-Length"]))))
             self.send_response(status)
             self.end_headers()
@@ -68,6 +70,32 @@ def test_lights_proxy_preserves_capture_and_validates_result(light_client, monke
     assert response.json() == result()
     assert received == [("/lights", PNG)]
     assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_custom_prompt_returns_matching_category(light_client, monkeypatch):
+    payload = result() | {"prompt": "red pipe", "groups": [{"kind": "custom", "detections": []}]}
+    with worker(monkeypatch, payload, prompt="red%20pipe"):
+        response = light_client.post("/api/local/lights", content=PNG, headers={"Content-Type": "image/png", "X-SAM-Prompt": "red%20pipe"})
+    assert response.status_code == 200
+    assert response.json()["prompt"] == "red pipe"
+
+
+@pytest.mark.parametrize("prompt", ["", "x" * 241, "%00pipe", "%FF"])
+def test_invalid_prompt_rejected_before_inference(light_client, prompt):
+    response = light_client.post("/api/local/lights", content=PNG, headers={"Content-Type": "image/png", "X-SAM-Prompt": prompt})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("change", [
+    {"prompt": "different object"},
+    {"groups": [{"kind": "custom", "detections": [{"score": 0.9, "box": [0, 0, 1, 1]}]}]},
+    {"groups": [{"kind": "custom", "detections": [{"score": 0.9, "box": [0, 0, 1, 1], "mask_png": "invalid"}]}]},
+], ids=["wrong-prompt", "missing-mask", "invalid-mask"])
+def test_custom_result_must_match_prompt_and_include_valid_masks(light_client, monkeypatch, change):
+    payload = result() | {"prompt": "red pipe", "groups": [{"kind": "custom", "detections": []}]} | change
+    with worker(monkeypatch, payload):
+        response = light_client.post("/api/local/lights", content=PNG, headers={"Content-Type": "image/png", "X-SAM-Prompt": "red%20pipe"})
+    assert response.status_code == 502
 
 
 @pytest.mark.parametrize("origin", ["https://example.com", "http://localhost:9999", "null"])

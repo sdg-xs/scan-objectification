@@ -1,5 +1,11 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## SAM custom-object workspace — 2026-10-27
+
+The user confirmed light detection works and requested arbitrary element context plus selection. **Open SAM workspace** now opens the dialog before inference, with a 240-character visual description, explicit Capture & detect, individual numbered match checkboxes and an explicit replace-selection action. The local API validates/echoes the prompt and returns individual binary PNG masks. Existing light defaults remain available to older API callers. Selection reuses stable source IDs and projects centers into chosen masks using frozen camera/section state, rejecting stale scan/selection state. Closing cancels pending publication. This selects through depth, so hidden splats can be included; use section clipping and manual refinement. No full 3D reconstruction or export.
+
+A real custom-prompt API request for `rectangular air vent` completed using SAM 3.1 on the generated blank image, with the correct echoed prompt, custom group and valid overlay. No real-object accuracy claim follows from a blank-image test. Verification passed: 68 backend tests, 35 frontend tests, 5 separate-runtime worker tests, typecheck and production build. Browser visual inspection remains denied; the user will verify the workspace and scan alignment. Focused independent review found no blocking issues.
+
 ## SAM 3.1 current-view lights — 2026-10-27
 
 The user explicitly authorized adding SAM detection to the existing viewer, superseding the original Build 1 segmentation exclusion for this feature. **Find lights in this view** captures the rendered scene directly, calls same-origin `/api/local/lights`, and shows a frozen annotated image plus counts for linear, round and bulb lights. Visible layers and clipping are respected; results do not select 3D splats. The separate `.venv-sam31` worker uses the actual local SAM 3.1 checkpoint, starts automatically on 8768 and leaves 8766 alone. Application pins and CSP are unchanged.

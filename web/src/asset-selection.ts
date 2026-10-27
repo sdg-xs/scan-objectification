@@ -3,6 +3,7 @@ import { dyno, readRgbaArray, RgbaArray, SplatMesh } from "@sparkjsdev/spark";
 import type { GsplatModifier } from "@sparkjsdev/spark";
 import { selectAsset } from "./asset-selection-model";
 import type { SelectionOperation } from "./asset-selection-model";
+import type { ScreenMask } from "./asset-selection-model";
 import type { SectionBox } from "./section-box";
 
 export function createSelectionTexture(count: number): RgbaArray {
@@ -189,13 +190,30 @@ export class AssetSelection {
     void this.select([x(Math.min(drag.x, event.clientX)), y(Math.max(drag.y, event.clientY)), x(Math.max(drag.x, event.clientX)), y(Math.min(drag.y, event.clientY))]);
   };
 
-  private async select(rectangle?: readonly [number, number, number, number]): Promise<void> {
+  captureMaskSelection(): (mask: ScreenMask, signal?: AbortSignal) => Promise<void> {
+    if (!this.mesh || this.restore || this.busy) throw new Error("Show context and finish the current selection before detection.");
+    const mesh = this.mesh;
+    mesh.updateWorldMatrix(true, false);
+    this.options.camera.updateMatrixWorld();
+    const world = mesh.matrixWorld.clone();
+    const projection = new THREE.Matrix4().multiplyMatrices(this.options.camera.projectionMatrix, this.options.camera.matrixWorldInverse);
+    const region = this.options.section.getBounds()?.clone();
+    const revision = this.revision;
+    return async (mask, signal) => {
+      mesh.updateWorldMatrix(true, false);
+      if (this.mesh !== mesh || this.revision !== revision || !mesh.matrixWorld.equals(world))
+        throw new Error("The scan or selection changed. Capture a new view before selecting.");
+      await this.select(undefined, { mask, projection, region, signal });
+    };
+  }
+
+  private async select(rectangle?: readonly [number, number, number, number], captured?: { mask: ScreenMask; projection: THREE.Matrix4; region?: ReturnType<SectionBox["getBounds"]>; signal?: AbortSignal }): Promise<void> {
     const mesh = this.mesh;
     const source = mesh?.extSplats;
     if (!mesh || !source || this.busy || this.restore) return;
     const revision = ++this.revision;
     const value = this.operation.value;
-    const operation: SelectionOperation = value === "add" || value === "remove" ? value : "replace";
+    const operation: SelectionOperation = captured ? "replace" : value === "add" || value === "remove" ? value : "replace";
     this.busy = true;
     this.tools.disabled = true;
     this.label.textContent = "Selecting splats… Esc cancels.";
@@ -205,17 +223,23 @@ export class AssetSelection {
       const result = await selectAsset({
         count: mesh.numSplats, center: (i) => source.getSplat(i).center,
         world: mesh.matrixWorld.clone(), previous: this.mask, operation,
-        region: this.options.section.getBounds(), rectangle,
-        projection: new THREE.Matrix4().multiplyMatrices(this.options.camera.projectionMatrix, this.options.camera.matrixWorldInverse),
-        canceled: () => revision !== this.revision,
+        region: captured ? captured.region : this.options.section.getBounds(), rectangle,
+        screenMask: captured?.mask,
+        projection: captured?.projection ?? new THREE.Matrix4().multiplyMatrices(this.options.camera.projectionMatrix, this.options.camera.matrixWorldInverse),
+        canceled: () => revision !== this.revision || Boolean(captured?.signal?.aborted),
       });
-      if (revision !== this.revision) return;
+      if (captured?.signal?.aborted) throw new Error("Selection canceled");
+      if (revision !== this.revision) {
+        if (captured) throw new Error("Selection canceled");
+        return;
+      }
       this.mask = result.mask;
       this.bounds = result.bounds;
       this.count = result.count;
       this.isolate.disabled = !this.count;
       this.paint();
     } catch (error) {
+      if (captured) throw error;
       if (revision === this.revision) this.options.error(error);
     } finally {
       if (revision === this.revision) {

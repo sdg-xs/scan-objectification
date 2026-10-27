@@ -69,12 +69,12 @@
           <p id="asset-status" class="hint" role="status">Load a scan to select an asset.</p>
           <p class="hint">Manual selection · boxes select through depth. Use the section box to limit depth.</p>
         </section>
-        <section class="layer light-tools" aria-label="Light detection">
-          <span class="eyebrow">03 / LIGHTS</span>
-          <h2>Find lights in this view</h2>
-          <p class="hint">SAM 3.1 checks the visible scene for linear fixtures, round lights and bulbs. Hide the BIM if it obscures the scan.</p>
-          <button id="find-lights" class="apply" disabled>Find lights in this view</button>
-          <p id="light-status" class="hint" role="status">Load a scan, then aim the view at the lights.</p>
+        <section class="layer light-tools" aria-label="SAM object detection">
+          <span class="eyebrow">03 / SAM 3.1</span>
+          <h2>Detect &amp; select</h2>
+          <p class="hint">Describe an element, review matches and select them in the scan. Hide BIM if it obscures your target.</p>
+          <button id="find-lights" class="apply" disabled>Open SAM workspace</button>
+          <p id="light-status" class="hint" role="status">Load a scan, then aim at the elements you need.</p>
         </section>
         <section class="alignment">
           <span class="eyebrow">04 / ALIGNMENT</span>
@@ -194,13 +194,23 @@
     </main>
     <dialog id="light-results" class="light-dialog" aria-labelledby="light-result-title">
       <header>
-        <div><span class="eyebrow">SAM 3.1 / LOCAL</span><h2 id="light-result-title">Lights in captured view</h2></div>
-        <button id="close-light-results" aria-label="Close light detection results">Close</button>
+        <div><span class="eyebrow">SAM 3.1 / LOCAL</span><h2 id="light-result-title">Detect &amp; select elements</h2></div>
+        <button id="close-light-results" aria-label="Close SAM workspace">Close</button>
       </header>
+      <form id="sam-form" class="sam-prompt-form">
+        <label for="sam-prompt">What should SAM find?</label>
+        <div class="sam-prompt-row">
+          <input id="sam-prompt" type="text" maxlength="240" required placeholder="e.g. rectangular air vent, red pipe, ceiling light" value="linear light fixture" />
+          <button id="sam-run" type="submit" class="apply">Capture &amp; detect</button>
+        </div>
+        <p class="hint">Describe visible objects and their appearance. Each run uses the current camera view.</p>
+      </form>
       <p id="light-result-status" role="status"></p>
-      <ul id="light-counts" class="light-counts" aria-label="Light counts"></ul>
+      <ul id="light-counts" class="light-counts" aria-label="Detection counts"></ul>
+      <div id="sam-matches" class="sam-matches" aria-label="Detected elements"></div>
+      <button id="sam-select" disabled>Replace scan selection with checked matches</button>
       <div class="light-image-frame"><img id="light-result-image" alt="Captured view for light detection" /></div>
-      <p class="hint">This is a frozen view. Close to adjust the camera and check another view. Masks identify visible pixels; the source scan is unchanged.</p>
+      <p class="hint">Results use a frozen view. Selection projects mask pixels through depth and can include hidden splats. Use the section box to limit depth, then refine or isolate with the existing selection tools. Source files stay unchanged.</p>
     </dialog>
     <script type="module" src="/src/viewer.ts"></script>
   </body>

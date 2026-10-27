@@ -1,10 +1,10 @@
 import { parseLightResult } from "./light-detection-model";
-
-const names = { linear: "Linear fixtures", round: "Round lights", bulb: "Visible bulbs" };
+import type { LightDetection } from "./light-detection-model";
+import type { ScreenMask } from "./asset-selection-model";
 
 function element<T extends HTMLElement>(id: string, type: { new (): T }): T {
   const value = document.getElementById(id);
-  if (!(value instanceof type)) throw new Error(`Missing light-detection control: ${id}`);
+  if (!(value instanceof type)) throw new Error(`Missing SAM control: ${id}`);
   return value;
 }
 
@@ -15,101 +15,166 @@ export class LightDetectionControls {
   private readonly image = element("light-result-image", HTMLImageElement);
   private readonly progress = element("light-result-status", HTMLParagraphElement);
   private readonly counts = element("light-counts", HTMLUListElement);
+  private readonly matches = element("sam-matches", HTMLDivElement);
+  private readonly prompt = element("sam-prompt", HTMLInputElement);
+  private readonly run = element("sam-run", HTMLButtonElement);
+  private readonly apply = element("sam-select", HTMLButtonElement);
   private readonly events = new AbortController();
   private request: AbortController | undefined;
   private preview: string | undefined;
   private available = false;
+  private result: { detections: LightDetection[]; width: number; height: number; select: (mask: ScreenMask, signal?: AbortSignal) => Promise<void> } | undefined;
 
-  constructor(private readonly capture: () => HTMLCanvasElement) {
+  constructor(private readonly capture: () => { canvas: HTMLCanvasElement; select: (mask: ScreenMask, signal?: AbortSignal) => Promise<void> }) {
     const signal = this.events.signal;
-    this.button.addEventListener("click", () => void this.detect(), { signal });
+    this.button.addEventListener("click", () => {
+      this.progress.textContent = "Describe an element and capture the current view to begin.";
+      this.dialog.showModal();
+      this.prompt.focus();
+    }, { signal });
+    element("sam-form", HTMLFormElement).addEventListener("submit", event => { event.preventDefault(); void this.detect(); }, { signal });
+    this.apply.addEventListener("click", () => void this.select(), { signal });
+    this.matches.addEventListener("change", () => this.updateApply(), { signal });
     element("close-light-results", HTMLButtonElement).addEventListener("click", () => this.dialog.close(), { signal });
     this.dialog.addEventListener("close", () => {
-      if (this.request) {
-        this.request.abort();
-        this.request = undefined;
-        this.status.textContent = "Detection canceled. Your live view is unchanged.";
-      }
-      this.button.disabled = !this.available;
-      this.releasePreview();
-      this.image.removeAttribute("src");
+      this.request?.abort();
+      this.request = undefined;
+      this.resetResults();
+      this.setBusy(false);
     }, { signal });
+    this.progress.textContent = "Describe an element and capture the current view to begin.";
   }
 
   setAvailable(available: boolean): void {
     this.available = available;
-    this.button.disabled = !available || Boolean(this.request);
+    this.button.disabled = !available;
+    this.run.disabled = !available || Boolean(this.request);
   }
 
-  private releasePreview(): void {
+  private setBusy(busy: boolean): void {
+    this.run.disabled = busy || !this.available;
+    this.prompt.disabled = busy;
+    this.apply.disabled = busy || !this.result;
+    for (const checkbox of this.matches.querySelectorAll<HTMLInputElement>("input"))
+      checkbox.disabled = busy || !this.result?.detections[Number(checkbox.value)]?.mask_png;
+  }
+
+  private updateApply(): void {
+    this.apply.disabled = Boolean(this.request) || !this.result || !this.matches.querySelector("input:checked");
+  }
+
+  private resetResults(): void {
+    this.result = undefined;
+    this.counts.replaceChildren();
+    this.matches.replaceChildren();
     if (this.preview) URL.revokeObjectURL(this.preview);
     this.preview = undefined;
+    this.image.removeAttribute("src");
+    this.apply.disabled = true;
   }
 
   private async detect(): Promise<void> {
     if (!this.available || this.request) return;
+    const prompt = this.prompt.value.trim();
+    if (!prompt) { this.prompt.focus(); return; }
     const request = new AbortController();
     this.request = request;
-    this.button.disabled = true;
+    this.resetResults();
+    this.setBusy(true);
     this.status.dataset.error = "false";
-    this.counts.replaceChildren();
-    this.progress.textContent = "Finding lights with local SAM 3.1… The first view takes longer to prepare.";
-    this.status.textContent = "Finding lights in the captured view…";
+    this.progress.textContent = `Finding “${prompt}” with local SAM 3.1…`;
+    this.status.textContent = "SAM is processing the captured view…";
     try {
-      const frame = this.capture();
-      this.dialog.showModal();
-      const blob = await new Promise<Blob>((resolve, reject) => frame.toBlob(
+      const { canvas, select } = this.capture();
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
         value => value ? resolve(value) : reject(new Error("The view could not be captured.")), "image/png",
       ));
       if (request.signal.aborted) return;
       if (blob.size > 8 * 1024 * 1024) throw new Error("The view is too large. Use a smaller browser window and try again.");
-      this.releasePreview();
       this.preview = URL.createObjectURL(blob);
       this.image.src = this.preview;
-      this.image.alt = "The captured view currently being checked for lights.";
       const response = await fetch("/api/local/lights", {
-        method: "POST", headers: { "Content-Type": "image/png" }, body: blob, signal: request.signal,
+        method: "POST", headers: { "Content-Type": "image/png", "X-SAM-Prompt": encodeURIComponent(prompt) }, body: blob, signal: request.signal,
       });
       let value: unknown;
-      try {
-        value = await response.json();
-      } catch {
-        throw new Error(response.status === 404
-          ? "Light detection needs the updated local app. Restart the app and try again."
-          : "Light detection returned an unreadable response. Please try again.");
-      }
+      try { value = await response.json(); }
+      catch { throw new Error("SAM returned an unreadable response. Restart the updated local API and try again."); }
       if (!response.ok) {
-        const detail = value !== null && typeof value === "object" && "detail" in value && typeof value.detail === "string"
-          ? value.detail : "Light detection is unavailable. Please try again.";
-        throw new Error(detail);
+        throw new Error(value !== null && typeof value === "object" && "detail" in value && typeof value.detail === "string"
+          ? value.detail : "Detection is unavailable. Please try again.");
       }
-      const result = parseLightResult(value, frame);
+      const result = parseLightResult(value, canvas, prompt);
       if (request.signal.aborted || this.request !== request) return;
       this.image.src = `data:image/png;base64,${result.overlay_png}`;
-      this.image.alt = "SAM 3.1 light masks and numbered boxes in the captured view.";
-      this.releasePreview();
-      for (const group of result.groups) {
-        const item = document.createElement("li");
-        item.className = `light-count light-${group.kind}`;
-        item.textContent = `${names[group.kind]}: ${group.detections.length}`;
-        this.counts.append(item);
-      }
-      const total = result.groups.reduce((sum, group) => sum + group.detections.length, 0);
-      this.progress.textContent = total
-        ? "Review the colored masks and numbered boxes. Categories may overlap."
-        : "No lights matched. Try a closer view with the fixtures clearly visible.";
-      this.status.textContent = result.groups.map(group => `${names[group.kind]}: ${group.detections.length}`).join(" · ");
+      this.image.alt = `SAM 3.1 detections for ${prompt} in the captured view.`;
+      const detections = result.groups.flatMap(group => group.detections);
+      this.result = { detections, width: result.width, height: result.height, select };
+      const count = document.createElement("li");
+      count.textContent = `${detections.length} matches · ${prompt}`;
+      this.counts.append(count);
+      detections.forEach((detection, index) => {
+        const label = document.createElement("label");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = String(index);
+        checkbox.checked = Boolean(detection.mask_png);
+        checkbox.disabled = !detection.mask_png;
+        label.append(checkbox, `Match ${index + 1} · ${Math.round(detection.score * 100)}%`);
+        this.matches.append(label);
+      });
+      this.progress.textContent = detections.length
+        ? "Choose matches to select in the scan. Numbers correspond to boxes in the image."
+        : "No matches. Try a closer view or a shorter visual description.";
+      this.status.textContent = `${detections.length} matches for “${prompt}”.`;
     } catch (error) {
       if (request.signal.aborted || this.request !== request) return;
-      const message = error instanceof Error ? error.message : "The view could not be checked. Please try again.";
-      this.status.textContent = this.progress.textContent = message;
-      this.status.dataset.error = "true";
+      this.report(error);
     } finally {
-      if (this.request === request) {
-        this.request = undefined;
-        this.button.disabled = !this.available;
-      }
+      if (this.request === request) { this.request = undefined; this.setBusy(false); this.updateApply(); }
     }
+  }
+
+  private async select(): Promise<void> {
+    const result = this.result;
+    if (!result || this.request) return;
+    const request = new AbortController();
+    this.request = request;
+    this.setBusy(true);
+    this.progress.textContent = "Projecting checked masks into the scan…";
+    try {
+      const pixels = new Uint8Array(result.width * result.height);
+      for (const checkbox of this.matches.querySelectorAll<HTMLInputElement>("input:checked")) {
+        const mask = result.detections[Number(checkbox.value)]?.mask_png;
+        if (!mask) continue;
+        const image = new Image();
+        image.src = `data:image/png;base64,${mask}`;
+        await image.decode();
+        if (request.signal.aborted) return;
+        if (image.naturalWidth !== result.width || image.naturalHeight !== result.height) throw new Error("The selection mask does not match this view.");
+        const canvas = document.createElement("canvas");
+        canvas.width = result.width;
+        canvas.height = result.height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("The browser could not read the selection mask.");
+        context.drawImage(image, 0, 0);
+        const rgba = context.getImageData(0, 0, result.width, result.height).data;
+        for (let i = 0; i < pixels.length; i++) if (rgba[i * 4]! > 127) pixels[i] = 1;
+      }
+      if (request.signal.aborted) return;
+      await result.select({ width: result.width, height: result.height, pixels }, request.signal);
+      if (request.signal.aborted) return;
+      this.status.textContent = "SAM masks applied. Review the green selection and use Isolate asset if needed.";
+      this.dialog.close();
+    } catch (error) {
+      if (!request.signal.aborted) this.report(error);
+    } finally {
+      if (this.request === request) { this.request = undefined; this.setBusy(false); this.updateApply(); }
+    }
+  }
+
+  private report(error: unknown): void {
+    this.status.textContent = this.progress.textContent = error instanceof Error ? error.message : "SAM could not complete this action.";
+    this.status.dataset.error = "true";
   }
 
   dispose(): void {
@@ -117,7 +182,6 @@ export class LightDetectionControls {
     this.request = undefined;
     this.events.abort();
     this.dialog.close();
-    this.releasePreview();
-    this.image.removeAttribute("src");
+    this.resetResults();
   }
 }

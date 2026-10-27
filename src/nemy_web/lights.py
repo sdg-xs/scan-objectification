@@ -15,6 +15,7 @@ import time
 from typing import Annotated, Literal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, build_opener, ProxyHandler
+from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -45,6 +46,7 @@ def png_size(data: bytes) -> tuple[int, int]:
 class LightDetection(BaseModel):
     score: Unit
     box: tuple[Unit, Unit, Unit, Unit]
+    mask_png: str | None = Field(default=None, max_length=MAX_RESPONSE)
 
     @model_validator(mode="after")
     def contained_box(self):
@@ -55,7 +57,7 @@ class LightDetection(BaseModel):
 
 
 class LightGroup(BaseModel):
-    kind: Literal["linear", "round", "bulb"]
+    kind: Literal["linear", "round", "bulb", "custom"]
     detections: list[LightDetection] = Field(max_length=50)
 
 
@@ -63,12 +65,13 @@ class LightResult(BaseModel):
     model: Literal["sam3.1"]
     width: int = Field(ge=1, le=MAX_SIDE)
     height: int = Field(ge=1, le=MAX_SIDE)
-    groups: list[LightGroup] = Field(min_length=3, max_length=3)
+    groups: list[LightGroup] = Field(min_length=1, max_length=3)
+    prompt: str | None = Field(default=None, max_length=240)
     overlay_png: str = Field(max_length=MAX_RESPONSE)
 
     @model_validator(mode="after")
     def matching_frame(self):
-        if [group.kind for group in self.groups] != ["linear", "round", "bulb"]:
+        if [group.kind for group in self.groups] != (["custom"] if self.prompt else ["linear", "round", "bulb"]):
             raise ValueError("Expected the three light categories.")
         try:
             overlay = base64.b64decode(self.overlay_png, validate=True)
@@ -76,7 +79,28 @@ class LightResult(BaseModel):
             raise ValueError("Invalid overlay.") from error
         if png_size(overlay) != (self.width, self.height):
             raise ValueError("Overlay dimensions do not match the capture.")
+        for group in self.groups:
+            for detection in group.detections:
+                if self.prompt and detection.mask_png is None:
+                    raise ValueError("Custom detections require an individual selection mask.")
+                if detection.mask_png is not None:
+                    if png_size(base64.b64decode(detection.mask_png, validate=True)) != (self.width, self.height):
+                        raise ValueError("Mask dimensions do not match the capture.")
         return self
+
+
+def read_prompt(encoded: str | None) -> str | None:
+    if encoded is None:
+        return None
+    if len(encoded) > 2880:
+        raise HTTPException(422, "Enter a visual object description of 1–240 characters.")
+    try:
+        prompt = unquote(encoded, errors="strict").strip()
+    except UnicodeError:
+        raise HTTPException(422, "Enter a visual object description of 1–240 characters.") from None
+    if not 1 <= len(prompt) <= 240 or any(ord(char) < 32 for char in prompt):
+        raise HTTPException(422, "Enter a visual object description of 1–240 characters.")
+    return prompt
 
 
 def _ready() -> bool:
@@ -137,16 +161,18 @@ def _ensure_worker(log_dir: Path) -> None:
         raise HTTPException(503, "The local SAM 3.1 worker could not start. See its local service log.")
 
 
-def _detect(data: bytes, dimensions: tuple[int, int], log_dir: Path) -> LightResult:
+def _detect(data: bytes, dimensions: tuple[int, int], log_dir: Path, prompt: str | None = None) -> LightResult:
     _ensure_worker(log_dir)
     request = UrlRequest(SAM_URL + "/lights", data=data, headers={"Content-Type": "image/png"}, method="POST")
+    if prompt is not None:
+        request.add_header("X-SAM-Prompt", quote(prompt, safe=""))
     try:
         with _opener.open(request, timeout=300) as response:
             body = response.read(MAX_RESPONSE + 1)
         if len(body) > MAX_RESPONSE:
             raise ValueError("Response too large")
         result = LightResult.model_validate_json(body)
-        if (result.width, result.height) != dimensions:
+        if (result.width, result.height) != dimensions or result.prompt != prompt:
             raise ValueError("Wrong frame")
         return result
     except HTTPError as error:
@@ -158,7 +184,7 @@ def _detect(data: bytes, dimensions: tuple[int, int], log_dir: Path) -> LightRes
             except (ValueError, OSError):
                 failure = None
             if isinstance(failure, dict) and failure.get("code") == "too_many_lights":
-                raise HTTPException(422, "More than 50 lights matched a category. Aim at a smaller area and try again.") from None
+                raise HTTPException(422, "More than 50 objects matched a category. Aim at a smaller area and try again.") from None
             raise HTTPException(422, "SAM 3.1 could not decode the captured PNG.") from None
         if error.code == 503:
             raise HTTPException(503, "SAM 3.1 could not process this view. Free GPU memory and try again.") from None
@@ -179,6 +205,7 @@ async def detect_lights(request: Request) -> JSONResponse:
         raise HTTPException(403, "Local viewer access only.")
     if request.headers.get("content-type", "").split(";", 1)[0].lower().strip() != "image/png":
         raise HTTPException(415, "Send a PNG capture.")
+    prompt = read_prompt(request.headers.get("x-sam-prompt"))
     data = bytearray()
     async for chunk in request.stream():
         if len(data) + len(chunk) > MAX_INPUT:
@@ -188,5 +215,5 @@ async def detect_lights(request: Request) -> JSONResponse:
         dimensions = png_size(data)
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
-    result = await run_in_threadpool(_detect, bytes(data), dimensions, request.app.state.settings.logs_dir)
-    return JSONResponse(result.model_dump(), headers={"Cache-Control": "no-store"})
+    result = await run_in_threadpool(_detect, bytes(data), dimensions, request.app.state.settings.logs_dir, prompt)
+    return JSONResponse(result.model_dump(exclude_none=True), headers={"Cache-Control": "no-store"})

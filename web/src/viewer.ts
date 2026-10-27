@@ -136,7 +136,8 @@ async function start(): Promise<void> {
 
   const lights = new LightDetectionControls(() => {
     if (!splats || !scanGroup.visible)
-      throw new Error("Show the Gaussian scan before finding lights.");
+      throw new Error("Show the Gaussian scan before detecting objects.");
+    const select = selection.captureMaskSelection();
     const capture = document.createElement("canvas");
     const size = captureSize(renderer.domElement.width, renderer.domElement.height);
     capture.width = size.width;
@@ -153,7 +154,7 @@ async function start(): Promise<void> {
     } finally {
       renderer.clippingPlanes = previousPlanes;
     }
-    return capture;
+    return { canvas: capture, select };
   });
 
   const resize = () => {

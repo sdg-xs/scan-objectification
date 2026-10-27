@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from nemy_web.lights import MAX_INPUT, MAX_RESPONSE, LightResult, png_size
+from nemy_web.lights import MAX_INPUT, MAX_RESPONSE, LightResult, png_size, read_prompt
 
 PROMPTS = (
     ("linear", "linear light fixture", (70, 220, 130)),
@@ -36,7 +36,7 @@ class SamEngine:
     def __init__(self, runtime: Path):
         self.runtime = runtime
 
-    def detect(self, image_path: Path):
+    def detect(self, image_path: Path, prompt: str | None = None):
         import torch
         from sam3.model_builder import build_sam3_predictor
 
@@ -54,8 +54,8 @@ class SamEngine:
             # multiplex model that does not accept it. Use its image API directly.
             state = predictor.model.init_state(resource_path=str(image_path), offload_video_to_cpu=True, async_loading_frames=False)
             with torch.inference_mode():
-                for kind, prompt, _color in PROMPTS:
-                    _frame, output = predictor.model.add_prompt(inference_state=state, frame_idx=0, text_str=prompt)
+                for kind, description, _color in (("custom", prompt, (70, 220, 130)),) if prompt else PROMPTS:
+                    _frame, output = predictor.model.add_prompt(inference_state=state, frame_idx=0, text_str=description)
                     yield kind, output
         finally:
             state.clear()
@@ -70,12 +70,13 @@ class DetectionLimit(ValueError):
     pass
 
 
-def annotated_result(image: Image.Image, outputs) -> dict:
+def annotated_result(image: Image.Image, outputs, prompt: str | None = None) -> dict:
     width, height = image.size
     overlay = image.convert("RGBA")
     groups = []
     labels = []
-    for (kind, _prompt, color), (output_kind, output) in zip(PROMPTS, outputs, strict=True):
+    prompts = (("custom", prompt, (70, 220, 130)),) if prompt else PROMPTS
+    for (kind, _prompt, color), (output_kind, output) in zip(prompts, outputs, strict=True):
         if output_kind != kind:
             raise ValueError("Unexpected category.")
         masks = np.asarray(output["out_binary_masks"], dtype=bool)
@@ -98,7 +99,9 @@ def annotated_result(image: Image.Image, outputs) -> dict:
             box = [float(x), float(y), float(right - x), float(bottom - y)]
             if box[2] <= 0 or box[3] <= 0:
                 continue
-            detections.append({"score": score, "box": box})
+            mask_buffer = io.BytesIO()
+            Image.fromarray(mask.astype(np.uint8) * 255).save(mask_buffer, format="PNG")
+            detections.append({"score": score, "box": box, "mask_png": base64.b64encode(mask_buffer.getvalue()).decode()})
             tint[mask] = (*color, 100)
             labels.append((kind, len(detections), color, box))
         overlay = Image.alpha_composite(overlay, Image.fromarray(tint))
@@ -110,10 +113,10 @@ def annotated_result(image: Image.Image, outputs) -> dict:
         draw.text((x, max(0, y - 13)), f"{kind} {index}", fill=color, stroke_width=1, stroke_fill="black")
     buffer = io.BytesIO()
     overlay.convert("RGB").save(buffer, format="PNG")
-    result = LightResult(model="sam3.1", width=width, height=height, groups=groups, overlay_png=base64.b64encode(buffer.getvalue()).decode())
+    result = LightResult(model="sam3.1", width=width, height=height, groups=groups, prompt=prompt, overlay_png=base64.b64encode(buffer.getvalue()).decode())
     if len(result.model_dump_json().encode()) > MAX_RESPONSE:
         raise ValueError("Detection response too large.")
-    return result.model_dump()
+    return result.model_dump(exclude_none=True)
 
 
 def create_worker(runtime: Path, engine=None) -> FastAPI:
@@ -135,7 +138,7 @@ def create_worker(runtime: Path, engine=None) -> FastAPI:
         ready = engine is not None or (runtime / "model/sam3.1_multiplex.pt").is_file()
         return JSONResponse({"model": "sam3.1", "status": "ready" if ready else "unavailable"}, status_code=200 if ready else 503)
 
-    def run(data: bytes):
+    def run(data: bytes, prompt: str | None):
         if not app.state.inference_lock.acquire(blocking=False):
             return JSONResponse({"detail": "Another view is being processed."}, status_code=429)
         try:
@@ -150,8 +153,9 @@ def create_worker(runtime: Path, engine=None) -> FastAPI:
             with tempfile.TemporaryDirectory(prefix="nemy-sam31-") as directory:
                 path = Path(directory) / "view.png"
                 image.save(path, format="PNG")
-                with closing(app.state.engine.detect(path)) as outputs:
-                    return annotated_result(image, outputs)
+                inference = app.state.engine.detect(path, prompt) if prompt else app.state.engine.detect(path)
+                with closing(inference) as outputs:
+                    return annotated_result(image, outputs, prompt)
         except DetectionLimit:
             return JSONResponse({"code": "too_many_lights", "detail": "Capture a smaller area; more than 50 lights matched a category."}, status_code=422)
         except Exception as error:
@@ -174,7 +178,8 @@ def create_worker(runtime: Path, engine=None) -> FastAPI:
             if len(data) + len(chunk) > MAX_INPUT:
                 raise HTTPException(413, "Capture exceeds 8 MiB.")
             data.extend(chunk)
-        return await run_in_threadpool(run, bytes(data))
+        prompt = read_prompt(request.headers.get("x-sam-prompt"))
+        return await run_in_threadpool(run, bytes(data), prompt)
 
     return app
 

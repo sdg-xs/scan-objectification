@@ -1,0 +1,11 @@
+# SAM workspace and custom object selection
+
+The user confirmed that local SAM 3.1 detects objects and requested a dedicated process window, an editable context field and detection/selection of arbitrary elements. Extend the existing native dialog rather than introduce another page or browser window: this preserves the loaded scene and camera and reuses the local inference path. A separate page would require sharing the in-memory scan; a sidebar would leave less room for reviewing masks.
+
+The workspace opens before inference. A required, bounded visual-description field and Capture & detect button replace the fixed light prompts in the user workflow. Each run freezes the current rendered scene, camera projection, scan placement and section region. The gateway validates and forwards the prompt to the worker; the worker returns a custom group, the echoed prompt and an individual lossless binary PNG mask for each detection, alongside the annotated preview. Preserve the existing light endpoint/default for older local callers. No new dependencies, cloud processing or dependency-pin changes.
+
+The user checks individual numbered matches and explicitly replaces the scan selection with their union. Reuse the existing source-ID selection loop, projecting splat centers into the captured masks with top-left image coordinates. Reject behind-camera/out-of-frustum centers and intersect with the captured section region. Reject stale scan/selection revisions or changed scan transforms. Use the existing preview, manual add/remove and isolation tools after applying. Closing cancels pending work and prevents partial selection publication.
+
+A single view cannot establish object depth: projected selection includes hidden splats behind mask pixels. Explain this in the window and recommend a section box plus manual refinement. The prompt describes visible appearance, not conversational reasoning. No automatic 3D object extraction, persistence or export is introduced.
+
+Verification: failing gateway/worker/mask-projection tests first, then the full app gate and separate worker suite; real custom-prompt model request through the updated API. Browser inspection remains subject to the existing denied origin permission; do not bypass it or claim visual QA.

@@ -7,6 +7,14 @@ const result = () => ({ model: "sam3.1", width: 1, height: 1, overlay_png: png, 
   return { kind, detections };
 }) });
 
+it("accepts custom objects and masks only for the requested prompt", () => {
+  const value = { ...result(), prompt: "red pipe", groups: [{ kind: "custom", detections: [{ score: 0.9, box: [0, 0, 1, 1], mask_png: png }] }] };
+  expect(parseLightResult(value, { width: 1, height: 1 }, "red pipe").groups[0]!.detections[0]!.mask_png).toBe(png);
+  expect(() => parseLightResult(value, { width: 1, height: 1 }, "air vent")).toThrow();
+  expect(() => parseLightResult({ ...value, groups: [{ kind: "custom", detections: [{ score: 0.9, box: [0, 0, 1, 1] }] }] }, { width: 1, height: 1 }, "red pipe")).toThrow();
+  expect(() => parseLightResult({ ...value, groups: [{ kind: "custom", detections: [{ score: 0.9, box: [0, 0, 1, 1], mask_png: "https://example.com/mask" }] }] }, { width: 1, height: 1 }, "red pipe")).toThrow();
+});
+
 it("bounds the captured frame without stretching either landscape or portrait", () => {
   expect(captureSize(3000, 1500)).toEqual({ width: 1600, height: 800 });
   expect(captureSize(900, 2700)).toEqual({ width: 533, height: 1600 });
