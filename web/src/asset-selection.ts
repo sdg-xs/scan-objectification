@@ -42,6 +42,8 @@ export class AssetSelection {
     frame: (bounds: THREE.Box3) => void;
     isolateContext: () => () => void;
     error: (error: unknown) => void;
+    visibility: () => Uint8Array | undefined;
+    onSegments: (labels: Uint8Array, prompt: string) => void;
   }) {
     this.marquee.className = "asset-marquee";
     this.marquee.hidden = true;
@@ -190,7 +192,21 @@ export class AssetSelection {
     void this.select([x(Math.min(drag.x, event.clientX)), y(Math.max(drag.y, event.clientY)), x(Math.max(drag.x, event.clientX)), y(Math.min(drag.y, event.clientY))]);
   };
 
-  captureMaskSelection(): (mask: ScreenMask, signal?: AbortSignal) => Promise<void> {
+  selectIndices(indices: Uint32Array): void {
+    if (!this.mesh?.extSplats || this.busy) return;
+    this.clear();
+    this.mesh.updateWorldMatrix(true, false);
+    this.bounds.makeEmpty();
+    for (const index of indices) {
+      this.mask[index] = 1;
+      this.bounds.expandByPoint(this.mesh.extSplats.getSplat(index).center.applyMatrix4(this.mesh.matrixWorld));
+    }
+    this.count = indices.length;
+    this.isolate.disabled = !this.count;
+    this.paint();
+  }
+
+  captureMaskSelection(): (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> {
     if (!this.mesh || this.restore || this.busy) throw new Error("Show context and finish the current selection before detection.");
     const mesh = this.mesh;
     mesh.updateWorldMatrix(true, false);
@@ -199,15 +215,16 @@ export class AssetSelection {
     const projection = new THREE.Matrix4().multiplyMatrices(this.options.camera.projectionMatrix, this.options.camera.matrixWorldInverse);
     const region = this.options.section.getBounds()?.clone();
     const revision = this.revision;
-    return async (mask, signal) => {
+    const visibility = this.options.visibility();
+    return async (mask, prompt, signal) => {
       mesh.updateWorldMatrix(true, false);
       if (this.mesh !== mesh || this.revision !== revision || !mesh.matrixWorld.equals(world))
         throw new Error("The scan or selection changed. Capture a new view before selecting.");
-      await this.select(undefined, { mask, projection, region, signal });
+      await this.select(undefined, { mask, projection, region, signal, prompt, visibility });
     };
   }
 
-  private async select(rectangle?: readonly [number, number, number, number], captured?: { mask: ScreenMask; projection: THREE.Matrix4; region?: ReturnType<SectionBox["getBounds"]>; signal?: AbortSignal }): Promise<void> {
+  private async select(rectangle?: readonly [number, number, number, number], captured?: { mask: ScreenMask; projection: THREE.Matrix4; region?: ReturnType<SectionBox["getBounds"]>; signal?: AbortSignal; prompt: string; visibility?: Uint8Array }): Promise<void> {
     const mesh = this.mesh;
     const source = mesh?.extSplats;
     if (!mesh || !source || this.busy || this.restore) return;
@@ -225,12 +242,17 @@ export class AssetSelection {
         world: mesh.matrixWorld.clone(), previous: this.mask, operation,
         region: captured ? captured.region : this.options.section.getBounds(), rectangle,
         screenMask: captured?.mask,
+        visibility: captured ? captured.visibility : this.options.visibility(),
         projection: captured?.projection ?? new THREE.Matrix4().multiplyMatrices(this.options.camera.projectionMatrix, this.options.camera.matrixWorldInverse),
         canceled: () => revision !== this.revision || Boolean(captured?.signal?.aborted),
       });
       if (captured?.signal?.aborted) throw new Error("Selection canceled");
       if (revision !== this.revision) {
         if (captured) throw new Error("Selection canceled");
+        return;
+      }
+      if (captured && result.labels) {
+        this.options.onSegments(result.labels, captured.prompt);
         return;
       }
       this.mask = result.mask;

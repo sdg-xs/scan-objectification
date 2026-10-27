@@ -23,9 +23,9 @@ export class LightDetectionControls {
   private request: AbortController | undefined;
   private preview: string | undefined;
   private available = false;
-  private result: { detections: LightDetection[]; width: number; height: number; select: (mask: ScreenMask, signal?: AbortSignal) => Promise<void> } | undefined;
+  private result: { detections: LightDetection[]; width: number; height: number; prompt: string; select: (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> } | undefined;
 
-  constructor(private readonly capture: () => { canvas: HTMLCanvasElement; select: (mask: ScreenMask, signal?: AbortSignal) => Promise<void> }) {
+  constructor(private readonly capture: () => { canvas: HTMLCanvasElement; select: (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> }) {
     const signal = this.events.signal;
     this.button.addEventListener("click", () => {
       this.progress.textContent = "Describe an element and capture the current view to begin.";
@@ -108,7 +108,7 @@ export class LightDetectionControls {
       this.image.src = `data:image/png;base64,${result.overlay_png}`;
       this.image.alt = `SAM 3.1 detections for ${prompt} in the captured view.`;
       const detections = result.groups.flatMap(group => group.detections);
-      this.result = { detections, width: result.width, height: result.height, select };
+      this.result = { detections, width: result.width, height: result.height, prompt, select };
       const count = document.createElement("li");
       count.textContent = `${detections.length} matches · ${prompt}`;
       this.counts.append(count);
@@ -123,7 +123,7 @@ export class LightDetectionControls {
         this.matches.append(label);
       });
       this.progress.textContent = detections.length
-        ? "Choose matches to select in the scan. Numbers correspond to boxes in the image."
+        ? "Check matches to segment and select. Then choose a Target Layer in Model Browser to classify them."
         : "No matches. Try a closer view or a shorter visual description.";
       this.status.textContent = `${detections.length} matches for “${prompt}”.`;
     } catch (error) {
@@ -158,12 +158,12 @@ export class LightDetectionControls {
         if (!context) throw new Error("The browser could not read the selection mask.");
         context.drawImage(image, 0, 0);
         const rgba = context.getImageData(0, 0, result.width, result.height).data;
-        for (let i = 0; i < pixels.length; i++) if (rgba[i * 4]! > 127) pixels[i] = 1;
+        for (let i = 0; i < pixels.length; i++) if (rgba[i * 4]! > 127) pixels[i] = Number(checkbox.value) + 1;
       }
       if (request.signal.aborted) return;
-      await result.select({ width: result.width, height: result.height, pixels }, request.signal);
+      await result.select({ width: result.width, height: result.height, pixels }, result.prompt, request.signal);
       if (request.signal.aborted) return;
-      this.status.textContent = "SAM masks applied. Review the green selection and use Isolate asset if needed.";
+      this.status.textContent = "Segmentation processed. Classify the selected objects into a Target Layer in Model Browser.";
       this.dialog.close();
     } catch (error) {
       if (!request.signal.aborted) this.report(error);

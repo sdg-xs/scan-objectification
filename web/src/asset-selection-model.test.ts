@@ -28,6 +28,20 @@ it("maps the upper image rows to positive camera Y", async () => {
   expect([...result.mask]).toEqual([1, 0]);
 });
 
+it("preserves instance labels while projecting all detections in one pass", async () => {
+  const pixels = new Uint8Array(16);
+  pixels[2] = 1;
+  pixels[14] = 2;
+  const positions = [new Vector3(0, 2, -5), new Vector3(0, -2, -5)];
+  const result = await selectAsset({ count: 2, center: i => positions[i]!.clone(), world: new Matrix4(),
+    previous: new Uint8Array(2), operation: "replace", projection, screenMask: { width: 4, height: 4, pixels } });
+  expect([...result.mask]).toEqual([1, 1]);
+  expect(result.labels && [...result.labels]).toEqual([1, 2]);
+  const hidden = await selectAsset({ count: 2, center: i => positions[i]!.clone(), world: new Matrix4(),
+    previous: new Uint8Array(2), operation: "replace", projection, visibility: new Uint8Array([0, 1]), screenMask: { width: 4, height: 4, pixels } });
+  expect(hidden.labels && [...hidden.labels]).toEqual([0, 2]);
+});
+
 it("selects source IDs inside the screen box, rejecting points behind the camera", async () => {
   const result = await selectAsset({ ...base, previous: new Uint8Array(3), operation: "replace", projection, rectangle: [-0.2, -0.2, 0.2, 0.2] });
   expect([...result.mask]).toEqual([1, 0, 0]);

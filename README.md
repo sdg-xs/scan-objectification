@@ -25,17 +25,21 @@ Enable **Section box** in the lower-left corner of the viewport. In **Resize** m
 
 The same oriented box clips the IFC and Gaussian layers and limits asset selection. These are temporary visual cuts and do not modify or export source files. Mesh cuts have open surfaces; Gaussian masking works on splat centers, so splat footprints can soften the boundary. No numeric section-box inputs or additional dependencies are used.
 
-## Manual asset isolation
+## Model Browser: groups and classification layers
 
-Load a Gaussian PLY, then use **Isolate an asset** in the sidebar:
+The collapsible **Model Browser** floats at the viewer's top left. It adapts the left-side hierarchy in Autodesk's [Select and classify mesh surfaces](https://www.autodesk.com/learn/ondemand/tutorial/select-and-classify-mesh-surfaces) tutorial to 3DGS elements. SAM supplies segmentation and selection; this panel manages their classification.
 
-1. Choose **Replace**, **Add**, or **Remove**, click **Draw box**, and drag over the scan. Green splats preview the selection; other splats are dimmed.
-2. Boxes select splat centers through depth. For a tight 3D region, enable and adjust the interactive **Section box**, then click **Select section**. A drawn box also respects the active section region.
-3. Click **Isolate asset** to hide other splats and the BIM. Orbit to inspect; **Show context** restores the previous layer visibility, section and camera view. **Clear** discards the selection.
+Classification actions use compact icon buttons. Pause the pointer over an icon for the browser's delayed tooltip. Eye icons control visibility, the target symbol chooses the target layer, and folder/layer-plus icons create groups/layers. Buttons and toggles retain accessible labels and keyboard focus indicators.
 
-Escape cancels a box drag or an in-progress selection. Replacing a model or changing scan placement clears the selection. Selection is temporary and does not edit the PLY. Original Gaussian properties, including directional color, remain intact.
+1. Use SAM's **Add & select checked matches**. Each match becomes a separate selected object under **Unclassified**.
+2. Expand **New layer / group**. Create a group such as `Level 1`, then a layer such as `Ceiling` inside it. A newly created layer becomes the current **Target Layer**.
+3. Choose a **Target Layer** from the list or its target icon, then use the **Classify** icon. Selected objects move into that layer under **Classified**, and the selection clears. Checking objects does not change the target layer.
+4. Select existing objects using their row checkboxes. **Unclassify** returns them to Unclassified; **Clear selection** restores normal highlighting.
+5. Use eye icons at root, group, layer or object level to control visibility. The scan-context icon controls the remaining source within Unclassified. The palette icon toggles layer-color tinting; turn it off to restore source colors.
 
-This is manual isolation. Saved selections and asset export remain future work.
+Rename objects, layers and groups in the tree. Move a layer between groups using its group selector. Removing a layer unclassifies its objects; removing a group keeps its layers; removing an object returns its splats to unsegmented context. Each splat belongs to one object, and new segmentation takes ownership where results overlap. Records last for the loaded scan and follow alignment changes; reloading or replacing it clears them. Source files and Gaussian properties are unchanged. Saving/exporting classifications is future work. The previous manual asset controls are temporarily hidden; SAM occupies sidebar slot **02**.
+
+This organization follows ReCap concepts, using our own implementation. See the [installed ReCap investigation](docs/research/2026-10-27-recap-classification.md) for static REA evidence, Autodesk documentation and limits.
 
 ## Detect and select elements with SAM 3.1
 
@@ -43,12 +47,12 @@ Start the Python API alongside Vite, or use the production viewer below. The loc
 
 1. Load a Gaussian PLY and aim at the elements you need. Hide BIM if it obscures the scan; the capture includes visible layers and respects the active section box.
 2. Click **Open SAM workspace**. Enter a visual description such as `rectangular air vent`, `red pipe` or `ceiling light`, then click **Capture & detect**. SAM matches visible appearance; the field is not a conversational instruction box. Descriptions are limited to 240 characters.
-3. Review the frozen image and numbered matches. Uncheck unwanted matches and click **Replace scan selection with checked matches** to preview them in green. Use **Isolate asset** or the existing manual add/remove tools to refine the result. Selection remains temporary.
+3. Review the frozen image and numbered matches. Uncheck unwanted matches and click **Add & select checked matches**. Each match becomes a separate selected object under **Model Browser → Unclassified**. Choose a Target Layer there and Classify.
 4. Close the window to adjust the view and repeat. Each run captures the current view; selection uses the camera and section box saved with that capture. Changed scan placement or a changed selection requires a fresh capture.
 
 Inference runs on this PC using the actual SAM 3.1 checkpoint. The API on port 8767 automatically starts its worker on loopback port 8768; port 8766 is unchanged. The worker releases model state after each request. No external image service or browser credentials are used. Captures are limited to 1600 pixels on the longest edge and 50 detections per prompt. Closing the dialog cancels the browser's wait; an already running inference may finish before another request can begin.
 
-Selection projects splat centers into the chosen image masks through depth, so hidden splats behind an object can also be selected. Limit depth with the section box and refine manually. This does not reconstruct a complete 3D object or export an asset. The real API/model path passed a generated-image smoke test; arbitrary-object accuracy and visual alignment still need user verification. Reload after updating the app, then select the files and re-align the view. Restart the API and its worker when their code changes. Worker diagnostics are in `data/logs/sam31-service.log`.
+Selection projects splat centers into the chosen image masks through depth, so splats behind an object can also be included. Splats hidden by object/group visibility are excluded. Limit depth with the section box. This does not reconstruct a complete 3D object or export an asset. The real API/model path passed a generated-image smoke test; arbitrary-object accuracy and visual alignment still need user verification. Reload after updating the app, then select the files and re-align the view. Restart the API and its worker when their code changes. Worker diagnostics are in `data/logs/sam31-service.log`.
 
 ## Saved scan placement
 

@@ -527,3 +527,48 @@ kbd {
 .sam-matches { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; max-height: 130px; overflow: auto; }
 .sam-matches label { display: flex; align-items: center; gap: 6px; }
 #sam-select { margin-bottom: 12px; }
+.segments-panel { position: absolute; top: 70px; left: 24px; width: min(350px, calc(100% - 48px)); max-height: calc(100% - 260px); overflow: auto; z-index: 4; border: 1px solid #52634c; border-radius: 6px; background: #17221ff5; color: #e4e9e8; box-shadow: 0 8px 24px #0004; font-size: 12px; }
+.segments-panel > summary { cursor: pointer; padding: 13px 14px; font-weight: 600; letter-spacing: .03em; border-bottom: 1px solid #35463d; }
+.segment-count { float: right; color: #b7df92; font-variant-numeric: tabular-nums; }
+.segments-body { padding: 12px; }
+.segment-panel-tools, .segment-operations { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.segments-panel button { padding: 5px 8px; color: #dce6dd; background: #293b32; border: 1px solid #52634c; border-radius: 4px; font-size: 11px; }
+.segments-panel input:not([type="checkbox"]), .segments-panel select { width: 100%; min-width: 0; padding: 6px; border: 1px solid #42584c; border-radius: 4px; color: inherit; background: #101b17; }
+#segment-group-tools, #segment-layer-tools { display: flex; flex-wrap: wrap; gap: 6px; border: 0; padding: 0; margin: 9px 0; min-width: 0; }
+#segment-group-tools input, #segment-layer-tools input { flex: 1; }
+#segment-group-tools button, #segment-layer-tools button { white-space: nowrap; }
+#segment-layer-tools select { flex: 1; }
+#segment-filter { margin: 10px 0; }
+.segment-target-label { display: grid; gap: 5px; font-size: 10px; color: #a5b5aa; margin-bottom: 8px; }
+.segment-operations button:first-child { color: #18231b; background: #b7df92; }
+.segment-create { margin-top: 10px; }
+.segment-create > summary { cursor: pointer; color: #b7df92; }
+.segment-tree { margin-top: 6px; border-top: 1px solid #35463d; }
+.segment-tree .segment-tree { margin-left: 8px; padding-left: 7px; border-left: 1px solid #35463d; }
+.segment-tree > summary { display: flex; cursor: pointer; gap: 4px; align-items: center; padding: 6px 0; }
+.segment-tree > summary::before { content: "▾"; color: #93a3a0; width: 9px; flex-shrink: 0; }
+.segment-tree:not([open]) > summary::before { content: "▸"; }
+.segment-tree > summary > span { flex: 1; color: #b7df92; font-weight: 600; }
+.segments-panel .segment-name { flex: 1; width: 0; padding: 4px; border-color: transparent; background: transparent; font-size: 11px; }
+.segments-panel .segment-name:hover, .segments-panel .segment-name:focus { border-color: #52634c; }
+.segment-tree button[aria-pressed="true"] { color: #b7df92; border-color: #b7df92; }
+.segments-panel input[type="color"] { width: 17px; min-width: 17px; height: 19px; padding: 0; border: 0; }
+.segment-visible { display: flex; gap: 3px; align-items: center; white-space: nowrap; font-size: 9px; }
+.segment-row { display: flex; align-items: center; gap: 4px; padding: 4px 0 4px 12px; }
+.segment-row:has(> input:checked) { background: #314c37; }
+.segment-splats { color: #a5b5aa; font-size: 9px; font-variant-numeric: tabular-nums; }
+.segments-panel .segment-layer-group { width: calc(100% - 20px); margin: 0 0 5px 20px; padding: 3px; font-size: 10px; }
+.segment-session-note { color: #95a89b; font-size: 10px; margin: 14px 0 0; }
+.segments-panel .classification-icon-button, .classification-toggle { display: inline-flex; align-items: center; justify-content: center; width: 29px; min-width: 29px; height: 29px; padding: 4px; border: 1px solid transparent; border-radius: 4px; flex-shrink: 0; }
+.segments-panel .classification-icon-button { padding: 4px; }
+.classification-icon-button svg, .classification-toggle svg { flex-shrink: 0; pointer-events: none; }
+.classification-toggle { position: relative; cursor: pointer; color: #96a99e; }
+.classification-toggle input { position: absolute; width: 1px !important; height: 1px; opacity: 0; }
+.classification-toggle:has(input:checked) { color: #dbe9df; }
+.classification-toggle:hover, .classification-icon-button:hover:not(:disabled) { background: #354d40; border-color: #6b8371; }
+.classification-toggle:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.classification-toggle:has(input:disabled) { opacity: .45; cursor: default; }
+.classification-visibility input:checked ~ .icon-hidden, .classification-visibility input:not(:checked) ~ .icon-visible { display: none; }
+.segment-panel-tools { justify-content: flex-start; }
+.segment-operations { justify-content: flex-start; }
+[hidden] { display: none !important; }

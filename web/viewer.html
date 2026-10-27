@@ -54,7 +54,7 @@
             Frame scan ↗
           </button>
         </section>
-        <section class="layer" aria-label="Asset selection">
+        <section class="layer" aria-label="Asset selection" hidden>
           <span class="eyebrow">02 / ASSET</span>
           <h2>Isolate an asset</h2>
           <fieldset id="asset-tools" disabled>
@@ -70,14 +70,14 @@
           <p class="hint">Manual selection · boxes select through depth. Use the section box to limit depth.</p>
         </section>
         <section class="layer light-tools" aria-label="SAM object detection">
-          <span class="eyebrow">03 / SAM 3.1</span>
+          <span class="eyebrow">02 / SAM 3.1</span>
           <h2>Detect &amp; select</h2>
-          <p class="hint">Describe an element, review matches and select them in the scan. Hide BIM if it obscures your target.</p>
+          <p class="hint">Use SAM to segment and select elements, then classify them into layers in the Model Browser.</p>
           <button id="find-lights" class="apply" disabled>Open SAM workspace</button>
           <p id="light-status" class="hint" role="status">Load a scan, then aim at the elements you need.</p>
         </section>
         <section class="alignment">
-          <span class="eyebrow">04 / ALIGNMENT</span>
+          <span class="eyebrow">03 / ALIGNMENT</span>
           <h2>Place the scan</h2>
           <p class="hint">
             Layers start centered independently. Adjust the scan to match the
@@ -150,9 +150,44 @@
             Alignment changes last for this session.
           </p>
         </section>
-        <p class="privacy">Models stay in this browser. Light detection sends one view to SAM 3.1 on this PC.</p>
+        <p class="privacy">Models stay in this browser. Detection sends one view to SAM 3.1 on this PC.</p>
       </aside>
       <section id="viewport" aria-label="3D model viewport">
+        <details id="segments-panel" class="segments-panel" open>
+          <summary><span>Model Browser</span><span id="segment-count" class="segment-count">0</span></summary>
+          <div class="segments-body">
+            <div class="segment-panel-tools">
+              <label><input id="segment-context" type="checkbox" checked disabled /> Unsegmented scan</label>
+              <label><input id="segment-colors" type="checkbox" disabled /> Layer colors</label>
+            </div>
+            <input id="segment-filter" type="search" aria-label="Filter Model Browser" placeholder="Filter objects, layers and groups" />
+            <label class="segment-target-label">Target Layer<select id="segment-target" title="Choose the classification target layer" disabled><option value="">Choose target layer…</option></select></label>
+            <div class="segment-operations">
+              <button id="segment-classify" type="button" disabled>Classify</button>
+              <button id="segment-unclassify" type="button" disabled>Unclassify</button>
+              <button id="segment-clear-highlight" type="button">Clear selection</button>
+            </div>
+            <details class="segment-create">
+              <summary>New layer / group</summary>
+              <form id="segment-group-form">
+                <fieldset id="segment-group-tools" disabled>
+                  <input id="segment-group-name" type="text" maxlength="80" required aria-label="New group name" placeholder="Group, e.g. Level 1" />
+                  <button id="segment-new-group" type="submit">+ Group</button>
+                </fieldset>
+              </form>
+              <form id="segment-layer-form">
+                <fieldset id="segment-layer-tools" disabled>
+                  <input id="segment-layer-name" type="text" maxlength="80" required aria-label="New layer name" placeholder="Layer, e.g. Ceiling" />
+                  <select id="segment-new-layer-group" aria-label="Group for new layer"><option value="">No group</option></select>
+                  <button id="segment-new-layer" type="submit">+ Layer</button>
+                </fieldset>
+              </form>
+            </details>
+            <p id="segment-status" class="hint" role="status">Use SAM to segment and select elements, then choose a Target Layer.</p>
+            <div id="segment-list"></div>
+            <p class="segment-session-note">Temporary · stays with this loaded scan.</p>
+          </div>
+        </details>
         <div
           id="section-tools"
           class="section-tools"
@@ -208,9 +243,9 @@
       <p id="light-result-status" role="status"></p>
       <ul id="light-counts" class="light-counts" aria-label="Detection counts"></ul>
       <div id="sam-matches" class="sam-matches" aria-label="Detected elements"></div>
-      <button id="sam-select" disabled>Replace scan selection with checked matches</button>
+      <button id="sam-select" disabled>Add &amp; select checked matches</button>
       <div class="light-image-frame"><img id="light-result-image" alt="Captured view for light detection" /></div>
-      <p class="hint">Results use a frozen view. Selection projects mask pixels through depth and can include hidden splats. Use the section box to limit depth, then refine or isolate with the existing selection tools. Source files stay unchanged.</p>
+      <p class="hint">Each checked match becomes a selected object in Model Browser → Unclassified. Choose a Target Layer and Classify it there. Projection goes through depth; use the section box to exclude splats behind the target. New objects take ownership of overlapping splats. Source files stay unchanged.</p>
     </dialog>
     <script type="module" src="/src/viewer.ts"></script>
   </body>

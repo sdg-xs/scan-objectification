@@ -7,6 +7,7 @@ import fragmentsWorkerUrl from "@thatopen/fragments/worker?url";
 import wasmUrl from "web-ifc/web-ifc.wasm?url";
 import { SectionBox } from "./section-box";
 import { AssetSelection } from "./asset-selection";
+import { SegmentPanel } from "./segments";
 import { LightDetectionControls } from "./light-detection";
 import { captureSize } from "./light-detection-model";
 import {
@@ -101,6 +102,8 @@ async function start(): Promise<void> {
   const selection = new AssetSelection({
     viewport, canvas: renderer.domElement, camera, orbit: controls, section, frame,
     error: showError,
+    visibility: () => segments.visibility(),
+    onSegments: (labels, prompt) => { selection.clear(); segments.add(labels, prompt); },
     isolateContext: () => {
       const bimVisible = bimGroup.visible;
       const scanVisible = scanGroup.visible;
@@ -134,9 +137,12 @@ async function start(): Promise<void> {
     },
   });
 
+  const segments = new SegmentPanel({ select: indices => selection.selectIndices(indices), clear: () => selection.clear(), error: showError });
+
   const lights = new LightDetectionControls(() => {
     if (!splats || !scanGroup.visible)
       throw new Error("Show the Gaussian scan before detecting objects.");
+    segments.clearSelection();
     const select = selection.captureMaskSelection();
     const capture = document.createElement("canvas");
     const size = captureSize(renderer.domElement.width, renderer.domElement.height);
@@ -339,6 +345,7 @@ async function start(): Promise<void> {
         throw new Error("The PLY contains no splats.");
       if (splats) {
         selection.setScan(undefined);
+        segments.setScan(undefined);
         scanGroup.remove(splats);
         splats.dispose();
       }
@@ -350,6 +357,7 @@ async function start(): Promise<void> {
       form.reset();
       orientScan();
       selection.setScan(splats);
+      segments.setScan(splats);
       status(
         "ply-status",
         `${file.name} · ${splats.numSplats.toLocaleString()} splats · loaded`,
@@ -440,6 +448,7 @@ async function start(): Promise<void> {
     observer.disconnect();
     renderer.setAnimationLoop(null);
     selection.dispose();
+    segments.dispose();
     lights.dispose();
     controls.dispose();
     section.dispose();
