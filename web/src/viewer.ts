@@ -161,6 +161,8 @@ async function start(): Promise<void> {
       renderer.clippingPlanes = previousPlanes;
     }
     return { canvas: capture, select };
+  }, paused => {
+    if (!disposed) renderer.setAnimationLoop(paused ? null : renderFrame);
   });
 
   const resize = () => {
@@ -175,12 +177,13 @@ async function start(): Promise<void> {
   controls.addEventListener("change", () => {
     void fragments.update().catch(showError);
   });
-  renderer.setAnimationLoop(() => {
+  function renderFrame(): void {
     controls.update();
     renderer.clippingPlanes = section.planes;
     renderer.render(scene, camera);
     section.render(renderer);
-  });
+  }
+  renderer.setAnimationLoop(renderFrame);
 
   function frame(box: THREE.Box3): void {
     try {

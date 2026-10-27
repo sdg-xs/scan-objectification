@@ -1,11 +1,19 @@
 import { expect, it } from "vitest";
-import { captureSize, parseLightResult } from "./light-detection-model";
+import { captureSize, parseLightResult, parseSamStatus } from "./light-detection-model";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const result = () => ({ model: "sam3.1", width: 1, height: 1, overlay_png: png, groups: ["linear", "round", "bulb"].map(kind => {
   const detections: { score: number; box: number[] }[] = [];
   return { kind, detections };
 }) });
+
+it("accepts warm-model timing data and rejects invalid durations", () => {
+  const timings = { reused_model: true, model_load_ms: 0, image_setup_ms: 1, detection_ms: 2, other_ms: 1, total_ms: 4 };
+  expect(parseLightResult({ ...result(), timings }, { width: 1, height: 1 }).timings).toEqual(timings);
+  expect(() => parseLightResult({ ...result(), timings: { ...timings, detection_ms: NaN } }, { width: 1, height: 1 })).toThrow();
+  expect(parseSamStatus({ model: "sam3.1", status: "ready", phase: "detecting", busy: true, model_loaded: true }).busy).toBe(true);
+  expect(() => parseSamStatus({ phase: "done" })).toThrow();
+});
 
 it("accepts custom objects and masks only for the requested prompt", () => {
   const value = { ...result(), prompt: "red pipe", groups: [{ kind: "custom", detections: [{ score: 0.9, box: [0, 0, 1, 1], mask_png: png }] }] };

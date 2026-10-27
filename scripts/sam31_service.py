@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-from contextlib import closing
+from contextlib import closing, asynccontextmanager
 import gc
 import io
 import logging
@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import time
 import traceback
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -33,37 +34,99 @@ PROMPTS = (
 
 
 class SamEngine:
-    def __init__(self, runtime: Path):
+    def __init__(self, runtime: Path, idle_seconds: float = 120):
         self.runtime = runtime
+        self.idle_seconds = idle_seconds
+        self._predictor = None
+        self._lock = threading.RLock()
+        self._timer = None
+        self._generation = 0
+        self.phase = "idle"
+        self.last_timings = {}
+
+    @property
+    def model_loaded(self):
+        return self._predictor is not None
+
+    def _build_predictor(self):
+        from sam3.model_builder import build_sam3_predictor
+        return build_sam3_predictor(
+            version="sam3.1", checkpoint_path=str(self.runtime / "model/sam3.1_multiplex.pt"),
+            use_fa3=False, compile=False, warm_up=False, async_loading_frames=False,
+        )
+
+    def _cancel_idle(self):
+        self._generation += 1
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+
+    def _drop_predictor(self):
+        self._predictor = None
+        gc.collect()
+        torch = sys.modules.get("torch")
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    def _expire(self, generation):
+        with self._lock:
+            if generation == self._generation:
+                self._drop_predictor()
+                self._timer = None
+                logging.info("SAM model released after inactivity")
+
+    def close(self):
+        with self._lock:
+            self._cancel_idle()
+            self._drop_predictor()
 
     def detect(self, image_path: Path, prompt: str | None = None):
-        import torch
-        from sam3.model_builder import build_sam3_predictor
-
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is unavailable.")
-        predictor = None
-        state = {}
-        try:
-            predictor = build_sam3_predictor(
-                version="sam3.1",
-                checkpoint_path=str(self.runtime / "model/sam3.1_multiplex.pt"),
-                use_fa3=False, compile=False, warm_up=False, async_loading_frames=False,
-            )
-            # The upstream session wrapper passes offload_state_to_cpu to a
-            # multiplex model that does not accept it. Use its image API directly.
-            state = predictor.model.init_state(resource_path=str(image_path), offload_video_to_cpu=True, async_loading_frames=False)
-            with torch.inference_mode():
-                for kind, description, _color in (("custom", prompt, (70, 220, 130)),) if prompt else PROMPTS:
-                    _frame, output = predictor.model.add_prompt(inference_state=state, frame_idx=0, text_str=description)
-                    yield kind, output
-        finally:
-            state.clear()
-            if predictor is not None:
-                predictor.bf16_context.__exit__(None, None, None)
-            del predictor
-            gc.collect()
-            torch.cuda.empty_cache()
+        with self._lock:
+            self._cancel_idle()
+            self.phase = "loading_model"
+            started = time.perf_counter()
+            import torch
+            if not torch.cuda.is_available():
+                self.phase = "idle"
+                raise RuntimeError("CUDA is unavailable.")
+            state = {}
+            reused = self.model_loaded
+            timings = {"reused_model": reused, "model_load_ms": 0.0, "image_setup_ms": 0.0, "detection_ms": 0.0}
+            try:
+                if self._predictor is None:
+                    self._predictor = self._build_predictor()
+                    # The upstream constructor enters thread-local autocast.
+                    # Exit it here; every request enters its own context below.
+                    self._predictor.bf16_context.__exit__(None, None, None)
+                    torch.cuda.synchronize()
+                    timings["model_load_ms"] = (time.perf_counter() - started) * 1000
+                with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                    self.phase = "preparing_image"
+                    frame_started = time.perf_counter()
+                    state = self._predictor.model.init_state(resource_path=str(image_path), offload_video_to_cpu=True, async_loading_frames=False)
+                    torch.cuda.synchronize()
+                    timings["image_setup_ms"] = (time.perf_counter() - frame_started) * 1000
+                    for kind, description, _color in (("custom", prompt, (70, 220, 130)),) if prompt else PROMPTS:
+                        self.phase = "detecting"
+                        detection_started = time.perf_counter()
+                        _frame, output = self._predictor.model.add_prompt(inference_state=state, frame_idx=0, text_str=description)
+                        torch.cuda.synchronize()
+                        timings["detection_ms"] += (time.perf_counter() - detection_started) * 1000
+                        self.phase = "encoding"
+                        yield kind, output
+            except Exception:
+                self._predictor = None
+                raise
+            finally:
+                state.clear()
+                gc.collect()
+                torch.cuda.empty_cache()
+                self.last_timings = timings
+                self.phase = "idle"
+                if self.model_loaded:
+                    self._timer = threading.Timer(self.idle_seconds, self._expire, args=(self._generation,))
+                    self._timer.daemon = True
+                    self._timer.start()
 
 
 class DetectionLimit(ValueError):
@@ -120,7 +183,14 @@ def annotated_result(image: Image.Image, outputs, prompt: str | None = None) -> 
 
 
 def create_worker(runtime: Path, engine=None) -> FastAPI:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    @asynccontextmanager
+    async def lifespan(app):
+        yield
+        close = getattr(app.state.engine, "close", None)
+        if close is not None:
+            await run_in_threadpool(close)
+
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
     app.state.inference_lock = threading.Lock()
     app.state.engine = engine if engine is not None else SamEngine(runtime)
@@ -136,11 +206,16 @@ def create_worker(runtime: Path, engine=None) -> FastAPI:
     @app.get("/health")
     def health():
         ready = engine is not None or (runtime / "model/sam3.1_multiplex.pt").is_file()
-        return JSONResponse({"model": "sam3.1", "status": "ready" if ready else "unavailable"}, status_code=200 if ready else 503)
+        busy = app.state.inference_lock.locked()
+        phase = getattr(app.state.engine, "phase", "idle")
+        return JSONResponse({"model": "sam3.1", "status": "ready" if ready else "unavailable", "busy": busy,
+            "phase": ("encoding" if phase == "idle" else phase) if busy else "idle",
+            "model_loaded": bool(getattr(app.state.engine, "model_loaded", False))}, status_code=200 if ready else 503)
 
     def run(data: bytes, prompt: str | None):
         if not app.state.inference_lock.acquire(blocking=False):
             return JSONResponse({"detail": "Another view is being processed."}, status_code=429)
+        started = time.perf_counter()
         try:
             try:
                 dimensions = png_size(data)
@@ -155,12 +230,22 @@ def create_worker(runtime: Path, engine=None) -> FastAPI:
                 image.save(path, format="PNG")
                 inference = app.state.engine.detect(path, prompt) if prompt else app.state.engine.detect(path)
                 with closing(inference) as outputs:
-                    return annotated_result(image, outputs, prompt)
+                    result = annotated_result(image, outputs, prompt)
+                timings = getattr(app.state.engine, "last_timings", None)
+                if timings:
+                    total = (time.perf_counter() - started) * 1000
+                    measured = sum(timings[key] for key in ("model_load_ms", "image_setup_ms", "detection_ms"))
+                    result["timings"] = {**timings, "other_ms": max(0, total - measured), "total_ms": total}
+                    logging.info("SAM request timings %s", result["timings"])
+                return result
         except DetectionLimit:
             return JSONResponse({"code": "too_many_lights", "detail": "Capture a smaller area; more than 50 lights matched a category."}, status_code=422)
         except Exception as error:
             logging.exception("SAM 3.1 inference failed")
             traceback.clear_frames(error.__traceback__)
+            close = getattr(app.state.engine, "close", None)
+            if close is not None:
+                close()
             gc.collect()
             torch = sys.modules.get("torch")
             if torch is not None and torch.cuda.is_available():

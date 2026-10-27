@@ -8,6 +8,28 @@ export interface LightResult {
   groups: LightGroup[];
   overlay_png: string;
   prompt?: string;
+  timings?: SamTimings;
+}
+export interface SamTimings { reused_model: boolean; model_load_ms: number; image_setup_ms: number; detection_ms: number; other_ms: number; total_ms: number }
+export type SamPhase = "idle" | "loading_model" | "preparing_image" | "detecting" | "encoding";
+
+export function parseSamStatus(value: unknown): { phase: SamPhase; busy: boolean; model_loaded: boolean; status: string } {
+  if (!record(value) || value.model !== "sam3.1" || !["ready", "unavailable", "offline"].includes(String(value.status)) ||
+      !["idle", "loading_model", "preparing_image", "detecting", "encoding"].includes(String(value.phase)) ||
+      typeof value.busy !== "boolean" || typeof value.model_loaded !== "boolean") throw new Error("Invalid SAM status.");
+  const phase = value.phase;
+  if (phase !== "idle" && phase !== "loading_model" && phase !== "preparing_image" && phase !== "detecting" && phase !== "encoding") throw new Error("Invalid SAM phase.");
+  return { phase, busy: value.busy, model_loaded: value.model_loaded, status: String(value.status) };
+}
+
+function parseTimings(value: unknown): SamTimings {
+  if (!record(value) || typeof value.reused_model !== "boolean") throw new Error("Invalid SAM timings.");
+  const duration = (name: string): number => {
+    const item = value[name];
+    if (typeof item !== "number" || !Number.isFinite(item) || item < 0 || item > 86400000) throw new Error("Invalid SAM duration.");
+    return item;
+  };
+  return { reused_model: value.reused_model, model_load_ms: duration("model_load_ms"), image_setup_ms: duration("image_setup_ms"), detection_ms: duration("detection_ms"), other_ms: duration("other_ms"), total_ms: duration("total_ms") };
 }
 
 export function captureSize(width: number, height: number): { width: number; height: number } {
@@ -53,5 +75,5 @@ export function parseLightResult(value: unknown, frame: { width: number; height:
       throw new Error("SAM 3.1 did not return selection masks. Restart the updated local worker.");
     return { kind, detections };
   });
-  return { model: "sam3.1", ...frame, groups, overlay_png: value.overlay_png, ...(prompt ? { prompt } : {}) };
+  return { model: "sam3.1", ...frame, groups, overlay_png: value.overlay_png, ...(prompt ? { prompt } : {}), ...(value.timings !== undefined ? { timings: parseTimings(value.timings) } : {}) };
 }

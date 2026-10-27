@@ -1,4 +1,4 @@
-import { parseLightResult } from "./light-detection-model";
+import { parseLightResult, parseSamStatus } from "./light-detection-model";
 import type { LightDetection } from "./light-detection-model";
 import type { ScreenMask } from "./asset-selection-model";
 
@@ -14,6 +14,7 @@ export class LightDetectionControls {
   private readonly dialog = element("light-results", HTMLDialogElement);
   private readonly image = element("light-result-image", HTMLImageElement);
   private readonly progress = element("light-result-status", HTMLParagraphElement);
+  private readonly timing = element("sam-timing", HTMLParagraphElement);
   private readonly counts = element("light-counts", HTMLUListElement);
   private readonly matches = element("sam-matches", HTMLDivElement);
   private readonly prompt = element("sam-prompt", HTMLInputElement);
@@ -23,13 +24,15 @@ export class LightDetectionControls {
   private request: AbortController | undefined;
   private preview: string | undefined;
   private available = false;
+  private pollTimer: number | undefined;
   private result: { detections: LightDetection[]; width: number; height: number; prompt: string; select: (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> } | undefined;
 
-  constructor(private readonly capture: () => { canvas: HTMLCanvasElement; select: (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> }) {
+  constructor(private readonly capture: () => { canvas: HTMLCanvasElement; select: (mask: ScreenMask, prompt: string, signal?: AbortSignal) => Promise<void> }, private readonly pauseViewer: (paused: boolean) => void) {
     const signal = this.events.signal;
     this.button.addEventListener("click", () => {
       this.progress.textContent = "Describe an element and capture the current view to begin.";
       this.dialog.showModal();
+      this.pauseViewer(true);
       this.prompt.focus();
     }, { signal });
     element("sam-form", HTMLFormElement).addEventListener("submit", event => { event.preventDefault(); void this.detect(); }, { signal });
@@ -39,6 +42,8 @@ export class LightDetectionControls {
     this.dialog.addEventListener("close", () => {
       this.request?.abort();
       this.request = undefined;
+      this.stopPolling();
+      this.pauseViewer(false);
       this.resetResults();
       this.setBusy(false);
     }, { signal });
@@ -70,7 +75,32 @@ export class LightDetectionControls {
     if (this.preview) URL.revokeObjectURL(this.preview);
     this.preview = undefined;
     this.image.removeAttribute("src");
+    this.timing.textContent = "";
     this.apply.disabled = true;
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== undefined) window.clearTimeout(this.pollTimer);
+    this.pollTimer = undefined;
+  }
+
+  private async pollStatus(request: AbortController, started: number): Promise<void> {
+    if (request.signal.aborted || this.request !== request) return;
+    try {
+      const response = await fetch("/api/local/sam-status", { signal: request.signal, cache: "no-store" });
+      const status = parseSamStatus(await response.json());
+      if (request.signal.aborted || this.request !== request) return;
+      const text = status.status !== "ready" ? "Connecting to SAM 3.1…" : {
+        idle: status.model_loaded ? "Model ready. Waiting for results…" : "Preparing SAM 3.1…",
+        loading_model: "Loading SAM 3.1 model…",
+        preparing_image: "Preparing the captured image…",
+        detecting: "Detecting objects…",
+        encoding: "Preparing masks and results…",
+      }[status.phase];
+      this.progress.textContent = `${text} ${Math.floor((performance.now() - started) / 1000)}s · viewer paused`;
+    } catch { /* A status failure must not cancel the detection request. */ }
+    if (!request.signal.aborted && this.request === request)
+      this.pollTimer = window.setTimeout(() => void this.pollStatus(request, started), 1000);
   }
 
   private async detect(): Promise<void> {
@@ -93,6 +123,7 @@ export class LightDetectionControls {
       if (blob.size > 8 * 1024 * 1024) throw new Error("The view is too large. Use a smaller browser window and try again.");
       this.preview = URL.createObjectURL(blob);
       this.image.src = this.preview;
+      void this.pollStatus(request, performance.now());
       const response = await fetch("/api/local/lights", {
         method: "POST", headers: { "Content-Type": "image/png", "X-SAM-Prompt": encodeURIComponent(prompt) }, body: blob, signal: request.signal,
       });
@@ -105,6 +136,11 @@ export class LightDetectionControls {
       }
       const result = parseLightResult(value, canvas, prompt);
       if (request.signal.aborted || this.request !== request) return;
+      this.stopPolling();
+      if (result.timings) {
+        const t = result.timings;
+        this.timing.textContent = `${t.reused_model ? "Reused loaded model" : "Cold model load"} · Load ${(t.model_load_ms / 1000).toFixed(1)}s · Frame ${(t.image_setup_ms / 1000).toFixed(1)}s · Detect ${(t.detection_ms / 1000).toFixed(1)}s · Other ${(t.other_ms / 1000).toFixed(1)}s · Total ${(t.total_ms / 1000).toFixed(1)}s`;
+      }
       this.image.src = `data:image/png;base64,${result.overlay_png}`;
       this.image.alt = `SAM 3.1 detections for ${prompt} in the captured view.`;
       const detections = result.groups.flatMap(group => group.detections);
@@ -130,7 +166,7 @@ export class LightDetectionControls {
       if (request.signal.aborted || this.request !== request) return;
       this.report(error);
     } finally {
-      if (this.request === request) { this.request = undefined; this.setBusy(false); this.updateApply(); }
+      if (this.request === request) { this.request = undefined; this.stopPolling(); this.setBusy(false); this.updateApply(); }
     }
   }
 
@@ -161,9 +197,10 @@ export class LightDetectionControls {
         for (let i = 0; i < pixels.length; i++) if (rgba[i * 4]! > 127) pixels[i] = Number(checkbox.value) + 1;
       }
       if (request.signal.aborted) return;
+      const projectionStarted = performance.now();
       await result.select({ width: result.width, height: result.height, pixels }, result.prompt, request.signal);
       if (request.signal.aborted) return;
-      this.status.textContent = "Segmentation processed. Classify the selected objects into a Target Layer in Model Browser.";
+      this.status.textContent = `Segmentation projected in ${((performance.now() - projectionStarted) / 1000).toFixed(1)}s. Classify the selected objects in Model Browser.`;
       this.dialog.close();
     } catch (error) {
       if (!request.signal.aborted) this.report(error);
@@ -180,6 +217,8 @@ export class LightDetectionControls {
   dispose(): void {
     this.request?.abort();
     this.request = undefined;
+    this.stopPolling();
+    this.pauseViewer(false);
     this.events.abort();
     this.dialog.close();
     this.resetResults();

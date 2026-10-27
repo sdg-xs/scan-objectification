@@ -61,6 +61,26 @@ class LightGroup(BaseModel):
     detections: list[LightDetection] = Field(max_length=50)
 
 
+Milliseconds = Annotated[float, Field(ge=0, le=86400000, allow_inf_nan=False)]
+
+
+class SamTimings(BaseModel):
+    reused_model: bool
+    model_load_ms: Milliseconds
+    image_setup_ms: Milliseconds
+    detection_ms: Milliseconds
+    other_ms: Milliseconds
+    total_ms: Milliseconds
+
+
+class SamStatus(BaseModel):
+    model: Literal["sam3.1"] = "sam3.1"
+    status: Literal["ready", "unavailable", "offline"]
+    busy: bool = False
+    phase: Literal["idle", "loading_model", "preparing_image", "detecting", "encoding"] = "idle"
+    model_loaded: bool = False
+
+
 class LightResult(BaseModel):
     model: Literal["sam3.1"]
     width: int = Field(ge=1, le=MAX_SIDE)
@@ -68,6 +88,7 @@ class LightResult(BaseModel):
     groups: list[LightGroup] = Field(min_length=1, max_length=3)
     prompt: str | None = Field(default=None, max_length=240)
     overlay_png: str = Field(max_length=MAX_RESPONSE)
+    timings: SamTimings | None = None
 
     @model_validator(mode="after")
     def matching_frame(self):
@@ -195,14 +216,36 @@ def _detect(data: bytes, dimensions: tuple[int, int], log_dir: Path, prompt: str
         raise HTTPException(502, "SAM 3.1 returned an invalid detection result.") from None
 
 
-@router.post("/lights")
-async def detect_lights(request: Request) -> JSONResponse:
+def require_local_viewer(request: Request) -> None:
     if request.url.hostname not in {"127.0.0.1", "localhost", "::1"}:
         raise HTTPException(403, "Local viewer access only.")
     origin = request.headers.get("origin")
     allowed = {str(request.base_url).rstrip("/"), "http://localhost:5173", "http://127.0.0.1:5173"}
     if (origin is not None and origin not in allowed) or request.headers.get("sec-fetch-site") == "cross-site":
         raise HTTPException(403, "Local viewer access only.")
+
+
+def _status() -> SamStatus:
+    try:
+        with _opener.open(SAM_URL + "/health", timeout=2) as response:
+            body = response.read(4097)
+        if len(body) > 4096:
+            raise ValueError("Invalid status")
+        return SamStatus.model_validate_json(body)
+    except (URLError, OSError, ValueError):
+        return SamStatus(status="offline")
+
+
+@router.get("/sam-status")
+async def sam_status(request: Request) -> JSONResponse:
+    require_local_viewer(request)
+    result = await run_in_threadpool(_status)
+    return JSONResponse(result.model_dump(), headers={"Cache-Control": "no-store"})
+
+
+@router.post("/lights")
+async def detect_lights(request: Request) -> JSONResponse:
+    require_local_viewer(request)
     if request.headers.get("content-type", "").split(";", 1)[0].lower().strip() != "image/png":
         raise HTTPException(415, "Send a PNG capture.")
     prompt = read_prompt(request.headers.get("x-sam-prompt"))

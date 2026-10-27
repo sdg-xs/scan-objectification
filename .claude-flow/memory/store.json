@@ -1,0 +1,383 @@
+{
+  "entries": {
+    "cmd-1792715631488": {
+      "key": "cmd-1792715631488",
+      "value": "{\"command\":\"rtk wc -l \\\".superpowers/sdd/2026-10-20-usd-web-segmentation-foundation/progress.md\\\" \\\".superpowers/sdd/2026-10-22-usd-web-segmentation-continuation/progress.md\\\" \\\".superpowers/sdd/2026-10-22-usd-web-segmentation-continuation/task-3-brief.md\\\" \\\".superpowers/sdd/2026-10-22-usd-web-segmentation-continuation/task-3-report.md\\\" \\\"docs/superpowers/specs/2026-10-20-usd-web-segmentation-foundation-design.md\\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:33:51.488Z",
+      "lastAccessed": "2026-10-23T00:33:51.488Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:33:51.488Z"
+    },
+    "cmd-1792715705591": {
+      "key": "cmd-1792715705591",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js\\\" && git ls-files | rtk grep -v node_modules && echo --- && rtk git status --short && rtk git log --oneline -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:35:05.591Z",
+      "lastAccessed": "2026-10-23T00:35:05.591Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:35:05.591Z"
+    },
+    "cmd-1792715709495": {
+      "key": "cmd-1792715709495",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git log --oneline -2 && rtk wc -l src/nemy_web/uploads.py web/src/hash-worker.ts web/src/api.ts web/src/main.ts tests/test_uploads.py && git diff 45416f2 --stat | tail -5\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:35:09.495Z",
+      "lastAccessed": "2026-10-23T00:35:09.495Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:35:09.495Z"
+    },
+    "cmd-1792716108430": {
+      "key": "cmd-1792716108430",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" ./.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:41:48.430Z",
+      "lastAccessed": "2026-10-23T00:41:48.430Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:41:48.430Z"
+    },
+    "cmd-1792716139767": {
+      "key": "cmd-1792716139767",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && npm.cmd test -- --run 2>&1 | tail -5 && npm.cmd run typecheck 2>&1 | tail -2\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:42:19.767Z",
+      "lastAccessed": "2026-10-23T00:42:19.767Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:42:19.767Z"
+    },
+    "cmd-1792716313894": {
+      "key": "cmd-1792716313894",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git log --oneline -2 && git status --short | head -5\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:45:13.894Z",
+      "lastAccessed": "2026-10-23T00:45:13.894Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:45:13.894Z"
+    },
+    "cmd-1792716621825": {
+      "key": "cmd-1792716621825",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" ./.venv/Scripts/python.exe -m pytest tests/test_uploads.py -q 2>&1 | tail -2\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:50:21.825Z",
+      "lastAccessed": "2026-10-23T00:50:21.825Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:50:21.825Z"
+    },
+    "cmd-1792716669755": {
+      "key": "cmd-1792716669755",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" ./.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -2 && npm.cmd test -- --run 2>&1 | grep -E \\\"Test Files|Tests \\\" && npm.cmd run typecheck 2>&1 | tail -1 && echo TYPECHECK_OK\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:51:09.755Z",
+      "lastAccessed": "2026-10-23T00:51:09.755Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:51:09.755Z"
+    },
+    "cmd-1792716725233": {
+      "key": "cmd-1792716725233",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git add web/src tests/test_uploads.py && rtk git commit -m \\\"Start a fresh upload attempt after a definitive finalize failure\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:52:05.233Z",
+      "lastAccessed": "2026-10-23T00:52:05.233Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:52:05.233Z"
+    },
+    "cmd-1792716920055": {
+      "key": "cmd-1792716920055",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git diff 45416f2..HEAD --stat\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:55:20.055Z",
+      "lastAccessed": "2026-10-23T00:55:20.055Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:55:20.055Z"
+    },
+    "cmd-1792716946100": {
+      "key": "cmd-1792716946100",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git show 426e577 --stat && rtk git log --oneline -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:55:46.100Z",
+      "lastAccessed": "2026-10-23T00:55:46.100Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:55:46.100Z"
+    },
+    "cmd-1792717003405": {
+      "key": "cmd-1792717003405",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git diff 45416f2..HEAD -- src/nemy_web/app.py src/nemy_web/projects.py web/src/api.test.ts web/src/hash-worker.test.ts web/src/vite-env.d.ts\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:56:43.405Z",
+      "lastAccessed": "2026-10-23T00:56:43.405Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:56:43.405Z"
+    },
+    "cmd-1792717014329": {
+      "key": "cmd-1792717014329",
+      "value": "{\"command\":\"ls \\\"C:/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" \\\"C:/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45/.venv\\\" 2>&1 | head -5\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T00:56:54.329Z",
+      "lastAccessed": "2026-10-23T00:56:54.329Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T00:56:54.329Z"
+    },
+    "cmd-1792717520329": {
+      "key": "cmd-1792717520329",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && PYTHONPATH=src ./.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -5\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T01:05:20.329Z",
+      "lastAccessed": "2026-10-23T01:05:20.329Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T01:05:20.329Z"
+    },
+    "cmd-1792717541280": {
+      "key": "cmd-1792717541280",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && npm.cmd test -- --run 2>&1 | tail -8 && npm.cmd run typecheck 2>&1 | tail -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T01:05:41.280Z",
+      "lastAccessed": "2026-10-23T01:05:41.280Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T01:05:41.280Z"
+    },
+    "cmd-1792717940097": {
+      "key": "cmd-1792717940097",
+      "value": "{\"command\":\"cd \\\"C:/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && \\\"C:/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" - <<'EOF'\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T01:12:20.097Z",
+      "lastAccessed": "2026-10-23T01:12:20.097Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T01:12:20.097Z"
+    },
+    "cmd-1792717981033": {
+      "key": "cmd-1792717981033",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" ./.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -2 && npm.cmd test -- --run 2>&1 | grep -E \\\"Test Files|Tests \\\" && npm.cmd run typecheck 2>&1 | tail -1 && echo TYPECHECK_OK\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T01:13:01.033Z",
+      "lastAccessed": "2026-10-23T01:13:01.033Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T01:13:01.033Z"
+    },
+    "cmd-1792718023425": {
+      "key": "cmd-1792718023425",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git add web/src src/nemy_web tests && rtk git commit -m \\\"Clear dead resume states and orphaned parts after failed uploads\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T01:13:43.425Z",
+      "lastAccessed": "2026-10-23T01:13:43.425Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T01:13:43.425Z"
+    },
+    "cmd-1792721439348": {
+      "key": "cmd-1792721439348",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.worktrees/task-3-uploads\\\" && rtk git worktree list\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:10:39.348Z",
+      "lastAccessed": "2026-10-23T02:10:39.348Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:10:39.348Z"
+    },
+    "cmd-1792721444002": {
+      "key": "cmd-1792721444002",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && git log --oneline -2 && PYTHONPATH=\\\"$(pwd)/src\\\" ./.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -2\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:10:44.002Z",
+      "lastAccessed": "2026-10-23T02:10:44.002Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:10:44.002Z"
+    },
+    "cmd-1792721499986": {
+      "key": "cmd-1792721499986",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -m pytest -q 2>&1 | tail -2\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:11:39.986Z",
+      "lastAccessed": "2026-10-23T02:11:39.986Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:11:39.986Z"
+    },
+    "cmd-1792721681681": {
+      "key": "cmd-1792721681681",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && rtk git show 31a2571 --stat && rtk git log --oneline -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:14:41.681Z",
+      "lastAccessed": "2026-10-23T02:14:41.681Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:14:41.681Z"
+    },
+    "cmd-1792721702248": {
+      "key": "cmd-1792721702248",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && rtk git show 31a2571 --stat >/dev/null && rtk wc -l src/nemy_web/usd_ingest.py tests/test_usd_ingest.py tests/fixtures/make_gaussian_stage.py\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:15:02.248Z",
+      "lastAccessed": "2026-10-23T02:15:02.248Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:15:02.248Z"
+    },
+    "cmd-1792721709033": {
+      "key": "cmd-1792721709033",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && grep -n \\\"Task 4\\\" docs/superpowers/plans/2026-10-22-usd-web-segmentation-continuation.md | head -20\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:15:09.033Z",
+      "lastAccessed": "2026-10-23T02:15:09.033Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:15:09.033Z"
+    },
+    "cmd-1792721712513": {
+      "key": "cmd-1792721712513",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && sed -n '1,120p' docs/superpowers/plans/2026-10-22-usd-web-segmentation-continuation.md\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:15:12.513Z",
+      "lastAccessed": "2026-10-23T02:15:12.513Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:15:12.513Z"
+    },
+    "cmd-1792721714704": {
+      "key": "cmd-1792721714704",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && sed -n '248,470p' docs/superpowers/plans/2026-10-22-usd-web-segmentation-continuation.md\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:15:14.704Z",
+      "lastAccessed": "2026-10-23T02:15:14.704Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:15:14.704Z"
+    },
+    "cmd-1792722105902": {
+      "key": "cmd-1792722105902",
+      "value": "{\"command\":\"sed -n '260,295p' \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/Source Code/nemy.asset_metadata_property-0.5.0/nemy/asset_metadata_property/crop_tool.py\\\" 2>/dev/null || echo \\\"not found at that path\\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:21:45.902Z",
+      "lastAccessed": "2026-10-23T02:21:45.902Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:21:45.902Z"
+    },
+    "cmd-1792722106084": {
+      "key": "cmd-1792722106084",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && grep -n -A 40 \\\"Published manifest\\\" docs/superpowers/plans/2026-10-20-usd-web-segmentation-foundation.md | head -80\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:21:46.084Z",
+      "lastAccessed": "2026-10-23T02:21:46.084Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:21:46.084Z"
+    },
+    "cmd-1792722467572": {
+      "key": "cmd-1792722467572",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -m pytest tests/test_usd_ingest.py -q 2>&1 | tail -5\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:27:47.572Z",
+      "lastAccessed": "2026-10-23T02:27:47.572Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:27:47.572Z"
+    },
+    "cmd-1792722507993": {
+      "key": "cmd-1792722507993",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -I -c \\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:28:27.993Z",
+      "lastAccessed": "2026-10-23T02:28:27.993Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:28:27.993Z"
+    },
+    "cmd-1792722661415": {
+      "key": "cmd-1792722661415",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -I -c \\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:31:01.415Z",
+      "lastAccessed": "2026-10-23T02:31:01.415Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:31:01.415Z"
+    },
+    "cmd-1792722708382": {
+      "key": "cmd-1792722708382",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -m pytest -q 2>&1 | tail -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:31:48.382Z",
+      "lastAccessed": "2026-10-23T02:31:48.382Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:31:48.382Z"
+    },
+    "cmd-1792722738195": {
+      "key": "cmd-1792722738195",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -I -c \\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:32:18.195Z",
+      "lastAccessed": "2026-10-23T02:32:18.195Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:32:18.195Z"
+    },
+    "cmd-1792722782594": {
+      "key": "cmd-1792722782594",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -I -c \\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:33:02.594Z",
+      "lastAccessed": "2026-10-23T02:33:02.594Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:33:02.594Z"
+    },
+    "cmd-1792723380511": {
+      "key": "cmd-1792723380511",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -m pytest tests/test_usd_ingest.py -q 2>&1 | tail -4\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:43:00.511Z",
+      "lastAccessed": "2026-10-23T02:43:00.511Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:43:00.511Z"
+    },
+    "cmd-1792723516586": {
+      "key": "cmd-1792723516586",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && PYTHONPATH=\\\"$(pwd)/src\\\" \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -m pytest tests/test_usd_ingest.py -q 2>&1 | tail -2 && PYTHONPATH=\\\"$(pwd)/src\\\" \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.venv/Scripts/python.exe\\\" -m pytest -q 2>&1 | tail -2\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:45:16.586Z",
+      "lastAccessed": "2026-10-23T02:45:16.586Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:45:16.586Z"
+    },
+    "cmd-1792723567147": {
+      "key": "cmd-1792723567147",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && rtk git add src/nemy_web/usd_ingest.py tests && rtk git commit -m \\\"Honor the streaming budget and surface corrupt layers during validation\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T02:46:07.147Z",
+      "lastAccessed": "2026-10-23T02:46:07.147Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T02:46:07.147Z"
+    },
+    "cmd-1792726251542": {
+      "key": "cmd-1792726251542",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && rtk grep -n -A6 \\\"\\\\[project.scripts\\\\]\\\" pyproject.toml; rtk grep -n -B2 -A8 \\\"def main\\\" src/nemy_web/app.py\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T03:30:51.542Z",
+      "lastAccessed": "2026-10-23T03:30:51.542Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T03:30:51.542Z"
+    },
+    "cmd-1792727018866": {
+      "key": "cmd-1792727018866",
+      "value": "{\"command\":\"rtk ls -la session-2026-10-23-task4-review.md && rtk read session-2026-10-23-task4-review.md --max-lines 40\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T03:43:38.866Z",
+      "lastAccessed": "2026-10-23T03:43:38.866Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T03:43:38.866Z"
+    },
+    "cmd-1792727602219": {
+      "key": "cmd-1792727602219",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && git rev-parse --show-toplevel --git-common-dir && git worktree list | head -3\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T03:53:22.219Z",
+      "lastAccessed": "2026-10-23T03:53:22.219Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T03:53:22.219Z"
+    },
+    "cmd-1792728325353": {
+      "key": "cmd-1792728325353",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js/.claude/worktrees/agent-a12bdb9713a4b0a45\\\" && rtk read .env.example 2>/dev/null; grep -n \\\"field\\\\|def from_env\\\\|NEMY_\\\" src/nemy_web/config.py | head -30\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T04:05:25.353Z",
+      "lastAccessed": "2026-10-23T04:05:25.353Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T04:05:25.353Z"
+    },
+    "cmd-1792728664690": {
+      "key": "cmd-1792728664690",
+      "value": "{\"command\":\"cd \\\"/c/Users/JoshuaRetuta/Documents/TRANSITION TO 3js\\\" && git status --short | head -5; netstat -ano | grep \\\":8767\\\" | head -3; ls web/node_modules 2>/dev/null | head -2 && echo NODE_MODULES_OK\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-23T04:11:04.690Z",
+      "lastAccessed": "2026-10-23T04:11:04.690Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-22T04:11:04.690Z"
+    }
+  },
+  "version": "3.0.0"
+}

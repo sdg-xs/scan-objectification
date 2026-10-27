@@ -72,6 +72,27 @@ def test_lights_proxy_preserves_capture_and_validates_result(light_client, monke
     assert response.headers["Cache-Control"] == "no-store"
 
 
+def test_sam_status_uses_same_origin_gateway_without_starting_inference(light_client, monkeypatch):
+    with worker(monkeypatch) as received:
+        response = light_client.get("/api/local/sam-status")
+    assert response.status_code == 200
+    assert response.json()["model"] == "sam3.1"
+    assert received == []
+    assert response.headers["Cache-Control"] == "no-store"
+    assert light_client.get("/api/local/sam-status", headers={"Origin": "https://example.com"}).status_code == 403
+
+
+def test_detection_timings_are_forwarded_and_validated(light_client, monkeypatch):
+    timings = {"reused_model": True, "model_load_ms": 0, "image_setup_ms": 10, "detection_ms": 20, "other_ms": 5, "total_ms": 35}
+    with worker(monkeypatch, result() | {"timings": timings}):
+        response = light_client.post("/api/local/lights", content=PNG, headers={"Content-Type": "image/png"})
+    assert response.status_code == 200
+    assert response.json()["timings"] == timings
+    with worker(monkeypatch, result() | {"timings": timings | {"model_load_ms": -1}}):
+        response = light_client.post("/api/local/lights", content=PNG, headers={"Content-Type": "image/png"})
+    assert response.status_code == 502
+
+
 def test_custom_prompt_returns_matching_category(light_client, monkeypatch):
     payload = result() | {"prompt": "red pipe", "groups": [{"kind": "custom", "detections": []}]}
     with worker(monkeypatch, payload, prompt="red%20pipe"):

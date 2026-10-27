@@ -4,6 +4,9 @@ import base64
 import io
 from pathlib import Path
 import sys
+from contextlib import nullcontext
+from types import SimpleNamespace
+import threading
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -11,7 +14,51 @@ from fastapi.testclient import TestClient
 import numpy as np
 from PIL import Image
 
-from sam31_service import create_worker
+from sam31_service import create_worker, SamEngine
+
+
+def test_engine_reuses_model_resets_frames_and_releases_after_idle(monkeypatch, tmp_path):
+    built = []
+    states = []
+    evicted = threading.Event()
+    fake_torch = SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: True, synchronize=lambda: None, empty_cache=lambda: None),
+        autocast=lambda **kwargs: nullcontext(), inference_mode=nullcontext, bfloat16="bf16",
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    class Model:
+        def init_state(self, **kwargs):
+            state = {"frame": object()}
+            states.append(state)
+            return state
+        def add_prompt(self, **kwargs):
+            return 0, {"ok": True}
+
+    def build(self):
+        predictor = SimpleNamespace(model=Model(), bf16_context=nullcontext())
+        built.append(predictor)
+        return predictor
+
+    monkeypatch.setattr(SamEngine, "_build_predictor", build, raising=False)
+    engine = SamEngine(tmp_path, idle_seconds=0.05)
+    try:
+        assert list(engine.detect(tmp_path / "view.png", "pipe")) == [("custom", {"ok": True})]
+        assert engine.model_loaded
+        assert engine.last_timings["reused_model"] is False
+        assert list(engine.detect(tmp_path / "view.png", "light")) == [("custom", {"ok": True})]
+        assert len(built) == 1
+        assert states == [{}, {}]
+        assert engine.last_timings["reused_model"] is True
+        original = engine._drop_predictor
+        def drop():
+            original()
+            evicted.set()
+        monkeypatch.setattr(engine, "_drop_predictor", drop)
+        assert evicted.wait(3)
+        assert not engine.model_loaded
+    finally:
+        engine.close()
 
 
 def capture():
