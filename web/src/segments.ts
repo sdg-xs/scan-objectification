@@ -138,7 +138,7 @@ export class SegmentPanel {
     this.render();
     this.status.textContent = !added ? "No visible splat centers matched. Adjust the view or section box and retry."
       : !this.model.unclassifiedVisible ? `${added} objects added. Turn on Unclassified to select and review them.`
-      : `${added} SAM objects selected in Unclassified. Choose a target layer and Classify.`;
+      : `${added} SAM objects selected in Unclassified.`;
   }
 
   clearSelection(): void { this.selected.clear(); this.actions.clear(); this.render(); }
@@ -240,29 +240,6 @@ export class SegmentPanel {
     return input;
   }
 
-  private row(segment: Segment): HTMLElement {
-    const row = document.createElement("div");
-    row.className = "segment-row";
-    const select = document.createElement("input");
-    select.type = "checkbox";
-    select.checked = this.selected.has(segment.id);
-    select.disabled = !this.model.isVisible(segment);
-    select.setAttribute("aria-label", `Select ${segment.name}`);
-    select.title = `Select ${segment.name}`;
-    select.addEventListener("change", () => {
-      if (select.checked) this.selected.add(segment.id); else this.selected.delete(segment.id);
-      this.highlight(); this.render();
-    });
-    const count = document.createElement("span");
-    count.className = "segment-splats";
-    count.textContent = segment.indices.length.toLocaleString();
-    count.title = "Splats";
-    row.append(select, this.name(segment.name, `Name of ${segment.name}`, name => this.model.update(segment.id, { name })), count,
-      this.eye(segment.name, segment.visible, visible => this.model.update(segment.id, { visible })),
-      this.button("remove", `Remove ${segment.name}; return its splats to unsegmented scan`, () => { this.model.remove(segment.id); this.changed(); }));
-    return row;
-  }
-
   private tree(title: string, key: string): { element: HTMLDetailsElement; heading: HTMLElement } {
     const element = document.createElement("details");
     element.className = "segment-tree";
@@ -283,7 +260,8 @@ export class SegmentPanel {
   }
 
   private layer(layer: SegmentLayer): HTMLElement {
-    const tree = this.tree("", `layer-${layer.id}`);
+    const row = document.createElement("div");
+    row.className = "segment-layer-row";
     const name = this.name(layer.name, `Layer name ${layer.name}`, value => { layer.name = value; });
     const color = document.createElement("input");
     color.type = "color";
@@ -291,26 +269,25 @@ export class SegmentPanel {
     color.setAttribute("aria-label", `Color of layer ${layer.name}`);
     color.title = `Change color of layer ${layer.name}`;
     color.addEventListener("input", () => { layer.color = color.value; this.paint(); });
-    const target = this.button("target", `Set target layer ${layer.name}`, () => { this.model.targetLayerId = layer.id; this.render(); });
+    const target = this.button("activeLayer", `Set active layer ${layer.name}`, () => { this.model.targetLayerId = layer.id; this.render(); });
     target.setAttribute("aria-pressed", String(this.model.targetLayerId === layer.id));
-    tree.heading.replaceChildren(color, name, target, this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }));
-    this.chooseContainer(tree.heading, "layer", layer.id);
+    row.append(classificationIcon("layerItem"), name, color, target, this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }));
+    this.chooseContainer(row, "layer", layer.id);
     const group = document.createElement("select");
     group.className = "segment-layer-group";
+    group.hidden = true;
     group.setAttribute("aria-label", `Group of layer ${layer.name}`);
     group.title = `Move layer ${layer.name} to a group`;
     this.groupOptions(group);
     group.value = layer.groupId === null ? "" : String(layer.groupId);
     group.addEventListener("change", () => { layer.groupId = group.value ? Number(group.value) : null; this.changed(); });
-    tree.element.append(group);
-    for (const segment of this.model.segments)
-      if (segment.layerId === layer.id && this.matches(segment)) tree.element.append(this.row(segment));
-    return tree.element;
+    row.append(group);
+    return row;
   }
 
   private group(group: SegmentGroup): HTMLElement {
     const tree = this.tree("", `group-${group.id}`);
-    tree.heading.replaceChildren(classificationIcon("folder"), this.name(group.name, `Group name ${group.name}`, value => { group.name = value; }),
+    tree.heading.replaceChildren(classificationIcon("layerGroup"), this.name(group.name, `Group name ${group.name}`, value => { group.name = value; }),
       this.eye(`group ${group.name}`, group.visible, visible => { group.visible = visible; }));
     this.chooseContainer(tree.heading, "group", group.id);
     for (const layer of this.model.layers) if (layer.groupId === group.id && this.matchesLayer(layer)) tree.element.append(this.layer(layer));
@@ -349,15 +326,21 @@ export class SegmentPanel {
     this.status.textContent = `${this.selected.size} selected · ${this.model.layers.length} layers. Use SAM to segment and select elements.`;
     document.querySelector<HTMLButtonElement>("#segment-classify")!.disabled = !this.selected.size || this.model.targetLayerId === null;
     document.querySelector<HTMLButtonElement>("#segment-unclassify")!.disabled = !this.selected.size;
-    const unclassified = this.tree("Unclassified", "unclassified");
-    unclassified.heading.append(this.eye("Unclassified", this.model.unclassifiedVisible, value => { this.model.unclassifiedVisible = value; }));
-    for (const segment of this.model.segments) if (segment.layerId === null && this.matches(segment)) unclassified.element.append(this.row(segment));
-    const classified = this.tree("Classified", "classified");
-    classified.heading.append(this.eye("Classified", this.model.classifiedVisible, value => { this.model.classifiedVisible = value; }));
+    const unclassified = document.createElement("div");
+    unclassified.className = "segment-layer-row segment-unclassified";
+    const name = document.createElement("span");
+    name.className = "segment-list-name";
+    name.textContent = "Unclassified";
+    unclassified.append(classificationIcon("unclassified"), name,
+      this.eye("Unclassified", this.model.unclassifiedVisible, value => { this.model.unclassifiedVisible = value; }));
+    const classified = this.tree("Root", "root");
+    const rootName = classified.heading.firstElementChild!;
+    classified.heading.replaceChildren(classificationIcon("classifiedRoot"), rootName,
+      this.eye("Root", this.model.classifiedVisible, value => { this.model.classifiedVisible = value; }));
     for (const group of this.model.groups)
       if (group.name.toLocaleLowerCase().includes(this.filter) || this.model.layers.some(layer => layer.groupId === group.id && this.matchesLayer(layer))) classified.element.append(this.group(group));
     for (const layer of this.model.layers) if (layer.groupId === null && this.matchesLayer(layer)) classified.element.append(this.layer(layer));
-    this.list.append(unclassified.element, classified.element);
+    this.list.append(unclassified, classified.element);
     this.markContainer();
   }
 

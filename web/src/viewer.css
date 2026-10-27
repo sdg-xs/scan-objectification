@@ -1,13 +1,9 @@
 .section-tools {
-  position: absolute;
-  bottom: 58px;
-  left: 24px;
-  z-index: 3;
   background: #18241ff0;
   border: 1px solid #52634c;
   border-radius: 5px;
   padding: 12px 14px;
-  max-width: calc(100% - 48px);
+  max-width: 100%;
   color: #e4e9e8;
   font-size: 12px;
 }
@@ -319,6 +315,7 @@ select {
 }
 #viewport {
   position: relative;
+  container-type: inline-size;
   min-width: 0;
   min-height: 320px;
   overflow: hidden;
@@ -343,7 +340,18 @@ select {
   z-index: 2;
   pointer-events: none;
 }
-.view-toolbar button {
+.view-actions {
+  position: absolute;
+  right: 24px;
+  bottom: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  max-width: calc(100% - 48px);
+  z-index: 3;
+}
+.view-actions > button {
   pointer-events: auto;
   background: #18241fe6;
   font-size: 11px;
@@ -533,7 +541,13 @@ kbd {
 .sam-matches { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; max-height: 130px; overflow: auto; }
 .sam-matches label { display: flex; align-items: center; gap: 6px; }
 #sam-select { margin-bottom: 12px; }
-.segments-panel { position: absolute; top: 70px; left: 24px; width: min(350px, calc(100% - 48px)); max-height: calc(100% - 260px); overflow: auto; z-index: 4; border: 1px solid #52634c; border-radius: 6px; background: #17221ff5; color: #e4e9e8; box-shadow: 0 8px 24px #0004; font-size: 12px; }
+.segments-panel { position: absolute; top: 70px; left: 24px; width: min(350px, calc(100% - 48px)); overflow: hidden; z-index: 4; border: 1px solid #52634c; border-radius: 6px; background: #17221ff5; color: #e4e9e8; box-shadow: 0 8px 24px #0004; font-size: 12px; }
+.segments-panel[open] { bottom: 58px; display: flex; flex-direction: column; }
+.segments-panel[open]::details-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.segments-panel[open] > summary { flex-shrink: 0; }
+.segments-panel[open] .segments-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.segments-panel[open] .segment-panel-tools, .segments-panel[open] #segment-filter { flex-shrink: 0; }
+#segment-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 4px; }
 .segments-panel > summary { cursor: pointer; padding: 13px 14px; font-weight: 600; letter-spacing: .03em; border-bottom: 1px solid #35463d; }
 .segment-count { float: right; color: #b7df92; font-variant-numeric: tabular-nums; }
 .segments-body { padding: 12px; }
@@ -585,5 +599,16 @@ kbd {
 .segment-dialog label { display: block; margin-bottom: 8px; }
 .segment-delete-actions { display: flex; gap: 8px; margin-top: 16px; }
 .segment-delete-actions button[type="submit"] { border-color: #db9987; }
+.segment-layer-row { display: flex; align-items: center; gap: 6px; padding: 6px 0 6px 12px; }
+.segment-layer-row > svg, .segment-tree > summary > svg { flex-shrink: 0; }
+.segment-list-name { flex: 1; font-weight: 600; }
+.segment-unclassified { padding-left: 9px; border-bottom: 1px solid var(--line); }
+#segment-list > .segment-tree { border-top: 0; }
+.segment-layer-row.segment-container-selected { box-shadow: inset 2px 0 var(--accent); }
+@container (max-width: 760px) {
+  .segments-panel[open] { top: 16px; bottom: 230px; }
+  .segments-panel[open] .segments-body { overflow: auto; }
+  #segment-list { flex: none; overflow: visible; }
+}
 .segment-operations { justify-content: flex-start; }
 [hidden] { display: none !important; }

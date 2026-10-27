@@ -57,7 +57,7 @@ input[type="number"], select, .sam-prompt-row input,
 }
 #viewport { background: #000; }
 .light-image-frame { background: var(--page-bg); }
-.section-tools, .view-toolbar button, .view-footer {
+.section-tools, .view-actions > button, .view-footer {
   background: #fffffff2;
   color: var(--ink);
   border-color: var(--line);
@@ -73,7 +73,8 @@ kbd, .segments-panel > summary, .segment-tree, .segment-tree .segment-tree { bor
 .segment-tree > summary::before { color: var(--muted); }
 .segments-panel .segment-name { background: transparent; border-color: transparent; }
 .segments-panel .segment-name:hover, .segments-panel .segment-name:focus { border-color: #b9c5d3; }
-.segment-row:has(> input:checked), .segment-tree > summary.segment-container-selected { background: var(--accent-soft); }
+.segment-row:has(> input:checked), .segment-tree > summary.segment-container-selected,
+.segment-layer-row.segment-container-selected { background: var(--accent-soft); }
 .segment-delete-actions button[type="submit"] { background: #a53e36; border-color: #a53e36; color: #fff; }
 .segment-delete-actions button[type="submit"]:hover { background: #8f342d; }
 #empty-state h2 { color: #e3e8ef; }

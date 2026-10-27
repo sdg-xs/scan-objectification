@@ -10,6 +10,11 @@ const paths = {
   eyeOff: ["M3 3l18 18M9 5.5c1-.3 2-.5 3-.5 6 0 10 7 10 7s-1 2-3 4M6 7c-3 2-4 5-4 5s4 7 10 7c2 0 4-.7 5-1.5"],
   colors: ["M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-4c-1-1 0-2 1-2h3c5 0 4-12-6-12Z", "M7 10h.01M9 6h.01M14 6h.01M18 10h.01"],
   folder: ["M3 7V5h6l2 2h10v13H3V7Z"],
+  layerItem: ["m3 17 7-10h11L14 17H3Z"],
+  layerGroup: ["M5 5H3v17h16v-2M8 2H6v17h16V2h-3", "m9 7 3-3h7l-3 3H9Z M9 11h9M9 15h9"],
+  activeLayer: ["M7 3H3v4m14-4h4v4M3 17v4h4m14-4v4h-4", "m6 15 5-6h8l-5 6H6Z"],
+  unclassified: ["M3 3h7v7H3Z", "M3 14h7v7H3Z", "M17.5 3a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z M17.5 14a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"],
+  classifiedRoot: ["M3 3h7v7H3Z", "M3 14h7v7H3Z", "M17.5 3a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z M17.5 14a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z", "m3 5 2 2 5-5m-7 15 2 2 5-5"],
 } as const;
 
 export type ClassificationIcon = keyof typeof paths;
@@ -18,9 +23,13 @@ export function classificationIcon(name: ClassificationIcon): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   for (const [attribute, value] of Object.entries({ viewBox: "0 0 24 24", width: "19", height: "19", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false" }))
     svg.setAttribute(attribute, value);
-  for (const data of paths[name]) {
+  for (const [index, data] of paths[name].entries()) {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", data);
+    if (name === "layerItem" || (name === "activeLayer" && index === 1) ||
+        ((name === "unclassified" || name === "classifiedRoot") && (index === 1 || index === 2)))
+      path.setAttribute("fill", "currentColor");
+    if (name === "classifiedRoot" && index === 3) path.setAttribute("stroke", "#379369");
     svg.append(path);
   }
   return svg;

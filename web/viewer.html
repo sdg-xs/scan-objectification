@@ -165,11 +165,13 @@
               <label class="segment-color-toggle"><input id="segment-colors" type="checkbox" disabled /> Original / classification colors</label>
             </div>
             <input id="segment-filter" type="search" aria-label="Filter Model Browser" placeholder="Filter objects, layers and groups" />
+            <div hidden>
             <label class="segment-target-label">Target Layer<select id="segment-target" title="Choose the classification target layer" disabled><option value="">Choose target layer…</option></select></label>
             <div class="segment-operations">
               <button id="segment-classify" type="button" disabled>Classify</button>
               <button id="segment-unclassify" type="button" disabled>Unclassify</button>
               <button id="segment-clear-highlight" type="button">Clear selection</button>
+            </div>
             </div>
             <dialog id="segment-create-dialog" class="segment-dialog" aria-labelledby="segment-create-title">
               <h3 id="segment-create-title">Add group or layer</h3>
@@ -200,9 +202,9 @@
                 </div>
               </form>
             </dialog>
-            <p id="segment-status" class="hint" role="status">Use SAM to segment and select elements, then choose a Target Layer.</p>
-            <div id="segment-list"></div>
-            <p class="segment-session-note">Temporary · stays with this loaded scan.</p>
+            <p id="segment-status" class="hint" role="status" hidden></p>
+            <div id="segment-list" aria-label="Layers and groups"></div>
+            <p class="segment-session-note" hidden>Temporary · stays with this loaded scan.</p>
           </div>
         </details>
         <dialog id="light-results" class="light-dialog" aria-labelledby="light-result-title">
@@ -224,8 +226,9 @@
           <div id="sam-matches" class="sam-matches" aria-label="Detected elements"></div>
           <button id="sam-select" disabled>Add &amp; select checked matches</button>
           <div class="light-image-frame"><img id="light-result-image" alt="Captured view for object detection" /></div>
-          <p class="hint">Each checked match becomes a selected object in Model Browser → Unclassified. Choose a Target Layer and Classify it there. Projection goes through depth; use the section box to exclude splats behind the target. New objects take ownership of overlapping splats. Source files stay unchanged.</p>
+          <p class="hint">Checked matches become selected objects in Unclassified. The Model Browser currently manages groups, layer colors, active layer and visibility; assignment to the active layer will be added later. Projection goes through depth; use the section box to exclude splats behind the target. Source files stay unchanged.</p>
         </dialog>
+        <div class="view-actions" aria-label="Viewport controls">
         <div
           id="section-tools"
           class="section-tools"
@@ -245,9 +248,10 @@
           </div>
           <p id="section-hint">Clip both layers with one box.</p>
         </div>
+        <button id="fit-all" disabled>Fit all <kbd>F</kbd></button>
+        </div>
         <div class="view-toolbar">
-          <span class="view-label">PERSPECTIVE <span>/ Z UP</span></span
-          ><button id="fit-all" disabled>Fit all <kbd>F</kbd></button>
+          <span class="view-label">PERSPECTIVE <span>/ Z UP</span></span>
         </div>
         <div id="empty-state">
           <span class="crosshair">+</span>

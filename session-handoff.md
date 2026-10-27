@@ -1,5 +1,15 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## ReCap-style layer list below Filter — 2026-10-27
+
+User requested replacing all visible content below Filter with Unclassified, then Root containing groups/layers. Target Layer, Classify/Unclassify/Clear controls, status/session notes and individual object rows are hidden from the current UI; model functionality and hidden operation bindings remain. Groups retain visibility; layer rows show name, color swatch, active-layer marker and visibility. Choosing active layer only updates the existing target ID and never assigns objects. Group reparent selector is retained hidden. Existing create/delete toolbar is unchanged. Root uses the existing classified visibility; Unclassified controls its original visibility. Filtering keeps both top rows and searches group/layer/object names.
+
+User restored the open native ReCap window for reference. CUA read-only screenshot of ReCap Mesh Editor established the four-shape Unclassified icon, checked-shape classified root, stacked-sheet group, slanted surface layer, color swatch, framed active-layer symbol and eye order. These symbols were redrawn as local SVGs. No ReCap changes were made. The local web viewer remains visually unverified under its existing origin access denial.
+
+User then requested the browser/list stay expanded down to the bottom even when empty. The open panel is anchored 70px from the viewport top and 58px above the bottom, leaving room for the footer. Toolbar/filter stay fixed while the bordered list fills remaining height and scrolls independently. The panel can still collapse. Section-box controls and Fit all now form a bottom-right stack, with section controls above Fit all and a 12px gap. The black viewport and theme remain.
+
+On viewports at most 760px wide, reserve the bottom control area by ending the panel 230px above the bottom and scroll the panel body, so Section/Fit all remain reachable. Independent layout review identified the overlap before this compact rule was added. Verification: 70 backend tests, 51 frontend tests, typecheck and build pass. Existing optional WebGPU/bundle warnings remain. Final layout has not been visually inspected in the denied local viewer.
+
 ## Model Browser toolbar and reference theme — 2026-10-27
 
 The user clarified that unsegmented-context functionality should be retained, only hidden. Restored `contextVisible`, its reset/binding and the context checkbox under a hidden label. Toolbar order is Add Group, Add Layer, Delete, then original/classification color toggle, using icons and tooltips. Creation uses dialogs. Click or keyboard-focus a group/layer heading to select the Delete target. Confirmation preserves objects and offers Unclassified or another surviving layer. Group deletion explicitly removes its layers; no destination inside the deletion is allowed. Legacy model removeGroup/removeLayer methods and object removal remain available. Target-layer and object selection behavior are retained.
