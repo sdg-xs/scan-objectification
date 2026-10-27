@@ -191,6 +191,7 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 .file-button {
+  position: relative;
   display: block;
   text-align: center;
   border: 1px dashed #52645b;
@@ -199,6 +200,7 @@ input[type="checkbox"] {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
+  overflow: hidden;
 }
 .file-button:hover {
   border-color: var(--accent);

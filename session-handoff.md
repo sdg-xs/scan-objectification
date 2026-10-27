@@ -1,5 +1,9 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Latest milestone — 2026-10-27
+
+Completed the pending section-box rotation work on `feat/bim-gaussian-viewer`. Rotate mode uses colored rings; face resizing follows local axes. IFC planes, Spark masking and Gaussian selection share the oriented box. Reset clears rotation. The production viewer loaded the actual BS17 IFC and aligned PLY in Chrome; a tilted cut selected 3,261,847 of 4,778,721 splats without a viewer error. All 43 backend, 28 frontend and 2 PLY-tool tests pass, plus typecheck and build. Disabling the rotation math caused both rotation tests to fail; restoring it returned the frontend suite to green. Existing Fragments optional WebGPU and bundle-size build warnings remain. Unrelated staged agent/worktree and research files are outside this change.
+
 ## Latest milestone — 2026-10-26
 
 The viewer now also has an interactive section box: enable it in the viewport, drag face grips in Resize mode or axis arrows in Move mode, and use Reset box to refit. Three.js controls/planes, Fragments culling and Spark box masking share one world-space box. Source files are unchanged. Playwright verified face cuts, movement, cancellation/navigation recovery and disabling; current gates pass with 43 backend, 21 frontend and 2 PLY-tool tests. The saved `test_files/BS17-PLY-aligned.ply` contains the earlier translation (17, 5.9, -3); it is gitignored.

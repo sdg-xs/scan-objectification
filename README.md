@@ -21,9 +21,9 @@ Layers start centered independently. Adjust the scan up axis, translation, rotat
 
 ## Interactive section box
 
-Enable **Section box** in the lower-left corner of the viewport. In **Resize** mode, drag a colored face handle to move that side of the box. In **Move** mode, drag the axis arrows to move the whole box. **Reset box** fits the box around the visible layers; switching it off restores the complete view. Escape cancels a face resize.
+Enable **Section box** in the lower-left corner of the viewport. In **Resize** mode, drag a colored face handle to move that side of the box. In **Move** mode, drag the axis arrows to move the whole box. In **Rotate** mode, drag the colored rings to tilt or turn the box. Face handles follow the rotated axes. **Reset box** clears rotation and fits the box around the visible layers; switching it off restores the complete view. Escape cancels a resize, move, or rotation.
 
-The same Z-up box clips the IFC and Gaussian layers. These are temporary visual cuts and do not modify or export source files. Mesh cuts have open surfaces; Gaussian masking works on splat centers, so splat footprints can soften the boundary. No numeric section-box inputs or additional dependencies are used.
+The same oriented box clips the IFC and Gaussian layers and limits asset selection. These are temporary visual cuts and do not modify or export source files. Mesh cuts have open surfaces; Gaussian masking works on splat centers, so splat footprints can soften the boundary. No numeric section-box inputs or additional dependencies are used.
 
 ## Manual asset isolation
 

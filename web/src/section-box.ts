@@ -5,6 +5,7 @@ import {
   resizeSectionFace,
   updateSectionPlanes,
   finishSectionMove,
+  sectionRegion,
 } from "./section-box-model";
 import type { BoxAxis } from "./section-box-model";
 
@@ -35,11 +36,12 @@ export class SectionBox {
   private readonly enabledInput: HTMLInputElement;
   private readonly moveButton: HTMLButtonElement;
   private readonly resizeButton: HTMLButtonElement;
+  private readonly rotateButton: HTMLButtonElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly hint: HTMLElement;
   private readonly raycaster = new THREE.Raycaster();
   private enabled = false;
-  private resizing = true;
+  private mode: "resize" | "translate" | "rotate" = "resize";
   private minimum = 0.1;
   private moveOrbitEnabled: boolean | undefined;
   private drag:
@@ -69,13 +71,15 @@ export class SectionBox {
     const enabled = toolbar.querySelector<HTMLInputElement>("#section-enabled");
     const move = toolbar.querySelector<HTMLButtonElement>("#section-move");
     const resize = toolbar.querySelector<HTMLButtonElement>("#section-resize");
+    const rotate = toolbar.querySelector<HTMLButtonElement>("#section-rotate");
     const reset = toolbar.querySelector<HTMLButtonElement>("#section-reset");
     const hint = toolbar.querySelector<HTMLElement>("#section-hint");
-    if (!enabled || !move || !resize || !reset || !hint)
+    if (!enabled || !move || !resize || !rotate || !reset || !hint)
       throw new Error("Missing section-box controls.");
     this.enabledInput = enabled;
     this.moveButton = move;
     this.resizeButton = resize;
+    this.rotateButton = rotate;
     this.resetButton = reset;
     this.hint = hint;
     const cube = new THREE.BoxGeometry(1, 1, 1);
@@ -151,7 +155,7 @@ export class SectionBox {
       "click",
       () => {
         this.finishDrag();
-        this.resizing = false;
+        this.mode = "translate";
         this.updateMode();
       },
       { signal },
@@ -160,11 +164,16 @@ export class SectionBox {
       "click",
       () => {
         this.finishDrag();
-        this.resizing = true;
+        this.mode = "resize";
         this.updateMode();
       },
       { signal },
     );
+    rotate.addEventListener("click", () => {
+      this.finishDrag();
+      this.mode = "rotate";
+      this.updateMode();
+    }, { signal });
     reset.addEventListener("click", () => this.reset(), { signal });
     canvas.addEventListener("pointerdown", this.pointerDown, {
       capture: true,
@@ -192,6 +201,9 @@ export class SectionBox {
           this.box.copy(this.drag.box);
           this.changed();
           this.finishDrag();
+        } else if (event.key === "Escape" && this.gizmo.dragging) {
+          this.gizmo.reset();
+          this.finishDrag();
         }
       },
       { signal },
@@ -203,8 +215,8 @@ export class SectionBox {
     this.enabledInput.disabled = !available;
   }
 
-  getBounds(): THREE.Box3 | undefined {
-    return this.enabled ? this.box.clone() : undefined;
+  getBounds(): ReturnType<typeof sectionRegion> | undefined {
+    return this.enabled ? sectionRegion(this.box, this.anchor.quaternion) : undefined;
   }
 
   setEnabled(enabled: boolean): void {
@@ -213,11 +225,13 @@ export class SectionBox {
   }
 
   private reset(): void {
+    this.finishDrag();
     const bounds = this.options.bounds();
     if (bounds.isEmpty()) return;
     const length = bounds.getSize(new THREE.Vector3()).length();
     this.minimum = Math.max(0.01, length * 0.0001);
     this.box.copy(bounds).expandByScalar(Math.max(0.1, length * 0.02));
+    this.anchor.quaternion.identity();
     this.changed();
   }
 
@@ -228,12 +242,13 @@ export class SectionBox {
       this.anchor.position.copy(center);
       this.wire.scale.copy(size);
       this.shape.position.copy(center);
+      this.shape.quaternion.copy(this.anchor.quaternion);
       this.shape.scale.copy(size).multiplyScalar(0.5);
       for (const face of this.handles) {
         face.mesh.position.set(0, 0, 0);
         face.mesh.position[face.axis] = (face.side * size[face.axis]) / 2;
       }
-      if (this.enabled) updateSectionPlanes(this.box, this.planes);
+      if (this.enabled) updateSectionPlanes(this.box, this.planes, this.anchor.quaternion);
     }
     this.options.onChange();
   }
@@ -242,24 +257,30 @@ export class SectionBox {
     this.anchor.visible = this.enabled;
     this.moveButton.disabled =
       this.resizeButton.disabled =
+      this.rotateButton.disabled =
       this.resetButton.disabled =
         !this.enabled;
-    this.moveButton.setAttribute("aria-pressed", String(!this.resizing));
-    this.resizeButton.setAttribute("aria-pressed", String(this.resizing));
+    this.moveButton.setAttribute("aria-pressed", String(this.mode === "translate"));
+    this.resizeButton.setAttribute("aria-pressed", String(this.mode === "resize"));
+    this.rotateButton.setAttribute("aria-pressed", String(this.mode === "rotate"));
     for (const face of this.handles)
-      face.mesh.visible = this.enabled && this.resizing;
-    if (this.enabled && !this.resizing) this.gizmo.attach(this.anchor);
+      face.mesh.visible = this.enabled && this.mode === "resize";
+    this.gizmo.setMode(this.mode === "rotate" ? "rotate" : "translate");
+    this.gizmo.setSpace(this.mode === "rotate" ? "local" : "world");
+    if (this.enabled && this.mode !== "resize") this.gizmo.attach(this.anchor);
     else this.gizmo.detach();
-    this.gizmo.enabled = this.enabled && !this.resizing;
+    this.gizmo.enabled = this.enabled && this.mode !== "resize";
     this.hint.textContent = !this.enabled
       ? "Clip both layers with one box."
-      : this.resizing
+      : this.mode === "resize"
         ? "Drag a colored face handle to cut. Esc cancels a drag."
-        : "Drag the arrows to move the box.";
+        : this.mode === "rotate"
+          ? "Drag the colored rings to rotate. Esc cancels."
+          : "Drag the arrows to move the box. Esc cancels.";
   }
 
   private pointerDown = (event: PointerEvent): void => {
-    if (!this.enabled || !this.resizing || event.button !== 0 || this.drag)
+    if (!this.enabled || this.mode !== "resize" || event.button !== 0 || this.drag)
       return;
     const { canvas, camera, orbit } = this.options;
     const rect = canvas.getBoundingClientRect();
@@ -282,6 +303,7 @@ export class SectionBox {
     const world = face.mesh.getWorldPosition(new THREE.Vector3());
     const direction = new THREE.Vector3();
     direction[face.axis] = 1;
+    direction.applyQuaternion(this.anchor.quaternion);
     const projected = world.clone().project(camera);
     const endpoint = world.clone().add(direction).project(camera);
     this.drag = {
@@ -316,7 +338,7 @@ export class SectionBox {
         ? pixels.dot(pixelAxis) / pixelAxis.lengthSq()
         : -pixels.y * worldPerPixel;
     this.box.copy(
-      resizeSectionFace(box, face.axis, face.side, delta, this.minimum),
+      resizeSectionFace(box, face.axis, face.side, delta, this.minimum, this.anchor.quaternion),
     );
     this.changed();
   };

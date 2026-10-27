@@ -1,4 +1,5 @@
 import { Box3, Matrix4, Vector3, Vector4 } from "three";
+import type { OBB } from "three/addons/math/OBB.js";
 
 export type SelectionOperation = "replace" | "add" | "remove";
 
@@ -9,7 +10,7 @@ export async function selectAsset(options: {
   world: Matrix4;
   previous: Uint8Array;
   operation: SelectionOperation;
-  region?: Box3;
+  region?: Box3 | OBB;
   projection?: Matrix4;
   rectangle?: readonly [number, number, number, number];
   canceled?: () => boolean;
