@@ -22,6 +22,7 @@ export class SegmentPanel {
   private deleting: { kind: "group" | "layer"; id: number } | undefined;
   private readonly events = new AbortController();
   private readonly selected = new Set<number>();
+  private selectionAnchor: number | undefined;
   private readonly expanded = new Map<string, boolean>();
   private filter = "";
   private mesh: SplatMesh | undefined;
@@ -32,13 +33,14 @@ export class SegmentPanel {
     const signal = this.events.signal;
     for (const [id, icon, label] of [
       ["segment-classify", "classify", "Classify selected objects into the Target Layer"],
+      ["segment-move", "move", "Move selected elements to the Target Layer; keep their names"],
       ["segment-unclassify", "unclassify", "Unclassify selected objects"],
       ["segment-clear-highlight", "clear", "Clear selection"],
       ["segment-add-group", "group", "Add Group"],
       ["segment-add-layer", "layer", "Add Layer"],
       ["segment-delete", "remove", "Delete selected group or layer"],
     ] as const) classificationButton(document.querySelector<HTMLButtonElement>(`#${id}`)!, icon, label);
-    for (const [id, text] of [["segment-classify", "Classify"], ["segment-unclassify", "Unclassify"]] as const) {
+    for (const [id, text] of [["segment-classify", "Classify"], ["segment-move", "Move"], ["segment-unclassify", "Unclassify"]] as const) {
       const label = document.createElement("span");
       label.textContent = text;
       document.querySelector(`#${id}`)!.append(label);
@@ -55,11 +57,13 @@ export class SegmentPanel {
         document.querySelector<HTMLFormElement>("#segment-layer-form")!.hidden = kind !== "layer";
         document.querySelector("#segment-create-title")!.textContent = kind === "group" ? "Add Group" : "Add Layer";
         document.querySelector<HTMLElement>("#segment-create-error")!.hidden = true;
+        this.configureCreationSelection(kind);
         if (kind === "layer" && this.container?.kind === "group")
           document.querySelector<HTMLSelectElement>("#segment-new-layer-group")!.value = String(this.container.id);
         this.createDialog.showModal();
         document.querySelector<HTMLInputElement>(`#segment-${kind}-name`)!.focus();
       }, { signal });
+    document.querySelector("#segment-group-classify")!.addEventListener("change", () => this.updateFirstLayerField(), { signal });
     document.querySelector("#segment-create-cancel")!.addEventListener("click", () => this.createDialog.close(), { signal });
     document.querySelector("#segment-delete")!.addEventListener("click", () => this.confirmDelete(), { signal });
     document.querySelector("#segment-delete-cancel")!.addEventListener("click", () => this.deleteDialog.close(), { signal });
@@ -78,8 +82,21 @@ export class SegmentPanel {
     document.querySelector<HTMLInputElement>("#segment-filter")!.addEventListener("input", event => {
       if (event.target instanceof HTMLInputElement) { this.filter = event.target.value.toLocaleLowerCase(); this.render(); }
     }, { signal });
+    this.list.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.clearSelection(); }
+    }, { signal });
     document.querySelector("#segment-clear-highlight")!.addEventListener("click", () => this.clearSelection(), { signal });
     document.querySelector("#segment-classify")!.addEventListener("click", () => this.beginClassification(), { signal });
+    document.querySelector("#segment-move")!.addEventListener("click", () => {
+      const layerId = this.model.targetLayerId;
+      if (layerId === null) return;
+      try {
+        this.model.move([...this.selected], layerId);
+        this.expanded.set(`layer-${layerId}`, true);
+        this.setActiveLayer(layerId);
+        this.changed();
+      } catch (error) { actions.error(error); }
+    }, { signal });
     document.querySelector("#segment-unclassify")!.addEventListener("click", () => {
       this.model.unclassify([...this.selected]);
       this.filter = "";
@@ -112,11 +129,16 @@ export class SegmentPanel {
       event.preventDefault();
       const input = document.querySelector<HTMLInputElement>("#segment-group-name")!;
       try {
+        const include = document.querySelector<HTMLInputElement>("#segment-group-classify")!.checked && this.selected.size > 0;
+        const layerName = document.querySelector<HTMLInputElement>("#segment-group-layer-name")!.value.trim();
+        if (include && !layerName) throw new Error("Enter a first layer name.");
         const group = this.model.createGroup(input.value);
+        if (include) this.model.targetLayerId = this.model.createLayer(layerName, group.id).id;
         this.revealContainer("group", group.id, group.id);
         input.value = "";
         this.createDialog.close();
         this.render();
+        if (include) this.beginClassification();
       }
       catch (error) { this.creationError(error); }
     }, { signal });
@@ -131,6 +153,7 @@ export class SegmentPanel {
         input.value = "";
         this.createDialog.close();
         this.render();
+        if (document.querySelector<HTMLInputElement>("#segment-layer-classify")!.checked && this.selected.size) this.beginClassification();
       } catch (error) { this.creationError(error); }
     }, { signal });
     this.render();
@@ -148,6 +171,7 @@ export class SegmentPanel {
     this.mesh = mesh;
     this.model.reset(mesh?.numSplats ?? 0, preserveHierarchy);
     this.selected.clear();
+    this.selectionAnchor = undefined;
     this.expanded.clear();
     this.filter = "";
     document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
@@ -160,6 +184,7 @@ export class SegmentPanel {
   }
 
   add(labels: Uint8Array, prompt: string): void {
+    this.createDialog.close();
     this.nameDialog.close();
     this.pendingClassification = undefined;
     const previous = new Set(this.model.segments.map(segment => segment.id));
@@ -173,6 +198,7 @@ export class SegmentPanel {
     this.selected.clear();
     for (const segment of this.model.segments)
       if (!previous.has(segment.id) && this.model.isVisible(segment)) this.selected.add(segment.id);
+    this.selectionAnchor = [...this.selected][0];
     this.paint();
     this.highlight();
     this.render();
@@ -181,14 +207,52 @@ export class SegmentPanel {
       : `${added} SAM objects selected in Unclassified.`;
   }
 
-  clearSelection(): void { this.selected.clear(); this.actions.clear(); this.render(); }
+  clearSelection(): void { this.selected.clear(); this.selectionAnchor = undefined; this.actions.clear(); this.render(); }
 
   visibility(): Uint8Array | undefined {
     return this.model.contextVisible && this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
       ? undefined : this.model.visibility();
   }
 
-  private changed(): void { this.selected.clear(); this.actions.clear(); this.paint(); this.render(); }
+  private changed(): void { this.selected.clear(); this.selectionAnchor = undefined; this.actions.clear(); this.paint(); this.render(); }
+
+  private chooseObject(id: number, event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): void {
+    const segment = this.model.segments.find(item => item.id === id);
+    if (!segment || !this.model.isVisible(segment)) return;
+    const ordered = this.visibleObjectIds();
+    const first = this.selectionAnchor === undefined ? -1 : ordered.indexOf(this.selectionAnchor);
+    const last = ordered.indexOf(id);
+    if (event.shiftKey && first >= 0 && last >= 0) {
+      if (!event.ctrlKey && !event.metaKey) this.selected.clear();
+      for (const item of ordered.slice(Math.min(first, last), Math.max(first, last) + 1)) this.selected.add(item);
+    } else {
+      if (event.ctrlKey || event.metaKey) {
+        if (this.selected.has(id)) this.selected.delete(id); else this.selected.add(id);
+      } else { this.selected.clear(); this.selected.add(id); }
+      this.selectionAnchor = id;
+    }
+    this.highlight();
+    this.markSelection();
+  }
+
+  private visibleObjectIds(): number[] {
+    const selectable = new Set(this.model.segments.filter(segment => this.model.isVisible(segment)).map(segment => segment.id));
+    return [...this.list.querySelectorAll<HTMLElement>("[data-object-id]")]
+      .filter(row => !row.closest("details:not([open])"))
+      .map(row => Number(row.dataset.objectId)).filter(id => selectable.has(id));
+  }
+
+  private markSelection(): void {
+    for (const row of this.list.querySelectorAll<HTMLElement>("[data-object-id]")) {
+      const selected = this.selected.has(Number(row.dataset.objectId));
+      row.setAttribute("data-selected", String(selected));
+      row.setAttribute("aria-description", `${selected ? "Selected" : "Not selected"}. Ctrl+click toggles selection; Shift+click selects a range.`);
+    }
+    document.querySelector<HTMLButtonElement>("#segment-classify")!.disabled = !this.selected.size || this.model.targetLayerId === null;
+    document.querySelector<HTMLButtonElement>("#segment-move")!.disabled = this.model.targetLayerId === null ||
+      !this.model.segments.some(segment => this.selected.has(segment.id) && segment.layerId !== this.model.targetLayerId);
+    document.querySelector<HTMLButtonElement>("#segment-unclassify")!.disabled = !this.model.segments.some(segment => this.selected.has(segment.id) && segment.layerId !== null);
+  }
 
   private setActiveLayer(id: number): void {
     const layer = this.model.layers.find(layer => layer.id === id);
@@ -243,6 +307,22 @@ export class SegmentPanel {
     const message = document.querySelector<HTMLElement>("#segment-create-error")!;
     message.textContent = error instanceof Error ? error.message : "Could not create this item.";
     message.hidden = false;
+  }
+
+  private configureCreationSelection(kind: "group" | "layer"): void {
+    const include = document.querySelector<HTMLInputElement>(`#segment-${kind}-classify`)!;
+    include.checked = this.model.segments.some(segment => this.selected.has(segment.id) && segment.layerId === null);
+    document.querySelector<HTMLElement>(`#segment-${kind}-selection`)!.hidden = !this.selected.size;
+    document.querySelector(`#segment-${kind}-selection-text`)!.textContent = `Classify ${this.selected.size} selected elements`;
+    if (kind === "group") this.updateFirstLayerField();
+  }
+
+  private updateFirstLayerField(): void {
+    const include = document.querySelector<HTMLInputElement>("#segment-group-classify")!.checked;
+    document.querySelector<HTMLElement>("#segment-group-layer-field")!.hidden = !include;
+    const input = document.querySelector<HTMLInputElement>("#segment-group-layer-name")!;
+    input.disabled = !include;
+    input.required = include;
   }
 
   private chooseContainer(heading: HTMLElement, kind: "group" | "layer", id: number): void {
@@ -352,21 +432,38 @@ export class SegmentPanel {
     const row = document.createElement("div");
     row.className = "segment-object-row";
     row.dataset.classified = String(segment.layerId !== null);
-    const select = document.createElement("input");
-    select.type = "checkbox";
-    select.checked = this.selected.has(segment.id);
-    select.disabled = !this.model.isVisible(segment);
-    select.setAttribute("aria-label", `Select mesh ${segment.name}`);
-    select.addEventListener("change", () => {
-      if (select.checked) this.selected.add(segment.id); else this.selected.delete(segment.id);
-      this.highlight();
-      this.render();
+    row.dataset.objectId = String(segment.id);
+    row.tabIndex = 0;
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-label", `Select mesh ${segment.name}`);
+    row.setAttribute("aria-disabled", String(!this.model.isVisible(segment)));
+    row.title = "Click to select · Ctrl+click to add/remove · Shift+click for a range";
+    row.addEventListener("click", event => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey) event.preventDefault();
+      this.chooseObject(segment.id, event);
+    });
+    row.addEventListener("keydown", event => {
+      if (event.target !== row) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        this.chooseObject(segment.id, event);
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const ids = this.visibleObjectIds();
+        const next = ids[ids.indexOf(segment.id) + (event.key === "ArrowDown" ? 1 : -1)];
+        if (next !== undefined) {
+          if (!event.ctrlKey && !event.metaKey) this.chooseObject(next, event);
+          this.list.querySelector<HTMLElement>(`[data-object-id="${next}"]`)?.focus();
+        }
+      }
     });
     const icon = classificationIcon(segment.layerId === null ? "mesh" : "classifiedMesh");
     icon.classList.add("segment-mesh-icon");
-    row.append(select, icon,
-      this.name(segment.name, `Mesh name ${segment.name}`, name => this.model.update(segment.id, { name }), 120),
-      this.eye(`mesh ${segment.name}`, segment.visible, visible => this.model.update(segment.id, { visible })));
+    const visibility = this.eye(`mesh ${segment.name}`, segment.visible, visible => this.model.update(segment.id, { visible }));
+    visibility.addEventListener("click", event => event.stopPropagation());
+    row.append(icon,
+      this.name(segment.name, `Mesh name ${segment.name}`, name => this.model.update(segment.id, { name }), 120), visibility);
     return row;
   }
 
@@ -440,8 +537,6 @@ export class SegmentPanel {
     this.list.replaceChildren();
     document.querySelector("#segment-count")!.textContent = String(this.model.segments.length);
     this.status.textContent = `${this.selected.size} selected · ${this.model.layers.length} layers. Use SAM to segment and select elements.`;
-    document.querySelector<HTMLButtonElement>("#segment-classify")!.disabled = !this.selected.size || this.model.targetLayerId === null;
-    document.querySelector<HTMLButtonElement>("#segment-unclassify")!.disabled = !this.model.segments.some(segment => this.selected.has(segment.id) && segment.layerId !== null);
     const unclassified = this.tree("Unclassified", "unclassified");
     unclassified.heading.className = "segment-layer-row segment-unclassified";
     const name = document.createElement("span");
@@ -460,6 +555,7 @@ export class SegmentPanel {
     for (const layer of this.model.layers) if (layer.groupId === null && this.matchesLayer(layer)) classified.element.append(this.layer(layer));
     this.list.append(unclassified.element, classified.element);
     this.markContainer();
+    this.markSelection();
   }
 
   private paint(): void {

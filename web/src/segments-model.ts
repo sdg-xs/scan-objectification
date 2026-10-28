@@ -109,6 +109,17 @@ export class SegmentCollection {
     for (const segment of this.segments) if (selected.has(segment.id)) segment.layerId = null;
   }
 
+  move(ids: readonly number[], layerId: number): void {
+    if (!this.layers.some(layer => layer.id === layerId)) throw new Error("Choose an existing target layer.");
+    if (!ids.length) throw new Error("Select elements to move.");
+    const objects = ids.map(id => {
+      const segment = this.segments.find(item => item.id === id);
+      if (!segment) throw new Error("The selection changed. Select the elements again.");
+      return segment;
+    });
+    for (const segment of objects) segment.layerId = layerId;
+  }
+
   update(id: number, patch: Partial<Pick<Segment, "name" | "visible">>): void {
     const segment = this.segments.find(item => item.id === id);
     if (!segment) throw new Error("This segment no longer exists.");

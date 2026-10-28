@@ -1,3 +1,11 @@
+## Element moves and row selection — 2026-10-28
+
+Element checkboxes are removed. Click selects one row, Ctrl/Meta+click toggles individuals, Shift+click selects the inclusive visible range from the anchor; Ctrl/Meta+Shift adds a range. Collapsed, filtered-out and model-hidden objects are excluded from ranges. Rows highlight through data-selected and expose their selection state through aria-description. Neutral group semantics preserve editable name/eye controls; review caught and removed incompatible listbox/option roles. Enter/Space and arrow keys support keyboard selection; Escape clears selection. Eye controls remain independent.
+
+Target Layer now offers Move between Classify and Unclassify. Move validates the whole selection before changing layer IDs, preserving element names, source IDs, visibility and numbering counters. It reveals the destination and clears selection afterward. Add Group/Add Layer exposes an assignment option when elements are selected, checked by default for Unclassified selections. A group with assignment creates a first layer. Naming confirmation then classifies into the new layer; cancelling naming preserves the newly created containers and leaves objects unchanged. Invalid first-layer names cannot create a partial group. New SAM results close stale creation dialogs.
+
+TDD RED captured before implementation. Verification: 84 frontend tests, 71 backend tests, typecheck and production build pass (existing optional WebGPU/bundle warnings). Real viewer interaction remains unverified under the existing local-origin browser permission denial. Unrelated build-check.log is preserved.
+
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
 ## Confirmed capture-dimension loss — 2026-10-28

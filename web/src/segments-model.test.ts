@@ -46,6 +46,22 @@ it("suggests a separate running Layer Name ## sequence and consumes numbers only
   expect(scene.classificationNames(ids.slice(2), b.id)[0]!.name).toBe("Furniture 01");
 });
 
+it("moves elements to another layer without renaming, renumbering or changing source indices", () => {
+  const scene = new SegmentCollection();
+  scene.reset(3);
+  scene.add(new Uint8Array([1, 2, 0]), "light");
+  const source = scene.createLayer("Lighting");
+  const target = scene.createLayer("Fixtures");
+  const [a, b] = scene.segments;
+  scene.classifyNamed([{ id: a!.id, name: "Ceiling fixture" }, { id: b!.id, name: "Bulb" }], source.id);
+  scene.move([a!.id], target.id);
+  expect([a!.name, a!.layerId, [...a!.indices]]).toEqual(["Ceiling fixture", target.id, [0]]);
+  expect(b!.layerId).toBe(source.id);
+  expect(target.nextElementNumber).toBe(1);
+  expect(() => scene.move([b!.id, 999], target.id)).toThrow();
+  expect(b!.layerId).toBe(source.id);
+});
+
 it("rejects incomplete naming and stale classification targets without partial changes", () => {
   const scene = new SegmentCollection();
   scene.reset(2);

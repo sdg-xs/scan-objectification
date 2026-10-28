@@ -36,7 +36,10 @@ class Control extends EventTarget {
   setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   getAttribute(name: string): string | null { return this.attributes.get(name) ?? null; }
   get firstElementChild(): Control | undefined { return this.children[0]; }
-  closest(): Control | undefined { return this.parent; }
+  closest(selector: string): Control | null {
+    for (let item: Control | undefined = this; item; item = item.parent) if (item.matches(selector)) return item;
+    return null;
+  }
   focus(): void { this.focused = true; this.fire("focusin"); }
   showModal(): void { this.open = true; }
   showPopover(): void { this.popoverOpen = true; }
@@ -50,11 +53,12 @@ class Control extends EventTarget {
     this.open = false;
     queueMicrotask(() => this.dispatchEvent(new Event("close")));
   }
-  fire(type: string, key?: string): void {
+  fire(type: string, key?: string, modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {}): void {
     if (type === "click" && this.disabled) return;
     const event = new Event(type, { cancelable: true, bubbles: true });
     Object.defineProperty(event, "target", { value: this });
     if (key) Object.defineProperty(event, "key", { value: key });
+    for (const [name, value] of Object.entries(modifiers)) Object.defineProperty(event, name, { value });
     const path: Control[] = [];
     for (let item: Control | undefined = this; item; item = item.parent) path.push(item);
     for (const item of path) { item.dispatchEvent(event); if (event.cancelBubble) break; }
@@ -67,6 +71,7 @@ class Control extends EventTarget {
   }
   querySelector(selector: string): Control | null { return this.querySelectorAll(selector)[0] ?? null; }
   private matches(selector: string): boolean {
+    if (selector === "details:not([open])") return this.tag === "details" && !this.open;
     const attribute = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(selector);
     if (attribute) {
       const key = attribute[1]!;
@@ -88,9 +93,11 @@ function workspace() {
     const item = new Control(match[1]);
     for (const attribute of match[2]!.matchAll(/([\w-]+)="([^"]*)"/g)) item.setAttribute(attribute[1]!, attribute[2]!);
     item.className = item.getAttribute("class") ?? "";
+    item.value = item.getAttribute("value") ?? "";
     item.disabled = /\bdisabled\b/.test(match[2]!);
     item.checked = /\bchecked\b/.test(match[2]!);
     item.hidden = /\bhidden\b/.test(match[2]!);
+    item.open = /\bopen\b/.test(match[2]!);
     stack.at(-1)!.append(item);
     const id = item.getAttribute("id");
     if (id) controls.set(id, item);
@@ -305,9 +312,7 @@ it("prompts for names, classifies under the target layer and unclassifies checke
   expect(app.get("segment-name-dialog").open).toBe(false);
   expect(app.named("Mesh name Linear fixture").parent?.dataset.classified).toBe("true");
   expect(app.named("Mesh name Bulb").parent?.dataset.classified).toBe("true");
-  const checkbox = app.named("Select mesh Linear fixture");
-  checkbox.checked = true;
-  checkbox.fire("change");
+  app.named("Select mesh Linear fixture").fire("click");
   app.get("segment-unclassify").fire("click");
   expect(app.named("Mesh name Linear fixture").parent?.dataset.classified).toBe("false");
   expect(app.named("Mesh name Bulb").parent?.dataset.classified).toBe("true");
@@ -375,5 +380,121 @@ it("rejects blank names without consuming numbers and cancels naming on a new so
   expect(app.get("segment-name-dialog").open).toBe(false);
   app.get("segment-name-form").fire("submit");
   expect(app.get("segment-target-label").textContent).toBe("Choose target layer…");
+  app.panel.dispose();
+});
+
+it("moves a checked element to the chosen target without opening naming", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  app.named("Select mesh Lighting 01").fire("click");
+  expect(app.get("segment-move").disabled).toBe(true);
+  app.create("layer", "Fixtures");
+  expect(app.get("segment-move").disabled).toBe(false);
+  app.get("segment-move").fire("click");
+  expect(app.get("segment-name-dialog").open).toBe(false);
+  const destination = app.named("Layer name Fixtures").parent?.parent;
+  expect(destination?.contains(app.named("Mesh name Lighting 01"))).toBe(true);
+  app.panel.dispose();
+});
+
+it("creates a layer for selected Unclassified elements and offers numbered naming", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-add-layer").fire("click");
+  expect(app.get("segment-layer-classify").checked).toBe(true);
+  app.get("segment-layer-name").value = "Lighting";
+  app.get("segment-layer-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(true);
+  expect(app.named("Name for mesh 1", "segment-classify-names").value).toBe("Lighting 01");
+  app.get("segment-name-form").fire("submit");
+  expect(app.named("Layer name Lighting").parent?.parent?.contains(app.named("Mesh name Lighting 01"))).toBe(true);
+  app.panel.dispose();
+});
+
+it("creates a group and first layer for selected Unclassified elements", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-add-group").fire("click");
+  expect(app.get("segment-group-classify").checked).toBe(true);
+  app.get("segment-group-name").value = "Electrical";
+  app.get("segment-group-layer-name").value = "Lighting";
+  app.get("segment-group-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(true);
+  app.get("segment-name-form").fire("submit");
+  const group = app.named("Group name Electrical").parent?.parent;
+  expect(group?.contains(app.named("Layer name Lighting"))).toBe(true);
+  expect(group?.contains(app.named("Mesh name Lighting 01"))).toBe(true);
+  app.panel.dispose();
+});
+
+it("selects rows with click, Control-click and Shift-click instead of selection checkboxes", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 4 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2, 3, 4]), "part");
+  const row = (index: number): Control => app.named(`Select mesh part ${index}`);
+  expect(row(1).children[0]!.tag).toBe("svg");
+  row(1).fire("click");
+  expect([1, 2, 3, 4].map(index => row(index).getAttribute("data-selected"))).toEqual(["true", "false", "false", "false"]);
+  row(3).fire("click", undefined, { ctrlKey: true });
+  expect([1, 2, 3, 4].map(index => row(index).getAttribute("data-selected"))).toEqual(["true", "false", "true", "false"]);
+  row(3).fire("click", undefined, { ctrlKey: true });
+  expect(row(3).getAttribute("data-selected")).toBe("false");
+  row(1).fire("click");
+  row(4).fire("click", undefined, { shiftKey: true });
+  expect([1, 2, 3, 4].map(index => row(index).getAttribute("data-selected"))).toEqual(["true", "true", "true", "true"]);
+  app.panel.dispose();
+});
+
+it("keeps selected elements Unclassified when creation assignment is unchecked", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "part");
+  app.get("segment-add-layer").fire("click");
+  app.get("segment-layer-classify").checked = false;
+  app.get("segment-layer-name").value = "Later";
+  app.get("segment-layer-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(false);
+  expect(app.named("Mesh name part 1").parent?.dataset.classified).toBe("false");
+  app.panel.dispose();
+});
+
+it("validates the first layer before creating a group for selected elements", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "part");
+  app.get("segment-add-group").fire("click");
+  app.get("segment-group-name").value = "Electrical";
+  app.get("segment-group-layer-name").value = " ";
+  app.get("segment-group-form").fire("submit");
+  expect(app.get("segment-create-dialog").open).toBe(true);
+  expect(() => app.named("Group name Electrical")).toThrow();
+  expect(app.get("segment-create-error").textContent).toBe("Enter a first layer name.");
+  app.panel.dispose();
+});
+
+it("Shift range selection skips elements inside collapsed layers", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 5 } as Parameters<SegmentPanel["setScan"]>[0]);
+  for (const [name, labels] of [
+    ["A", [1, 2, 0, 0, 0]], ["B", [0, 0, 1, 2, 0]], ["C", [0, 0, 0, 0, 1]],
+  ] as const) {
+    app.create("layer", name);
+    app.panel.add(new Uint8Array(labels), "part");
+    app.get("segment-classify").fire("click");
+    app.get("segment-name-form").fire("submit");
+  }
+  app.named("Layer name B").parent!.parent!.open = false;
+  app.named("Select mesh A 01").fire("click");
+  app.named("Select mesh C 01").fire("click", undefined, { shiftKey: true });
+  for (const name of ["A 01", "A 02", "C 01"]) expect(app.named(`Select mesh ${name}`).getAttribute("data-selected")).toBe("true");
+  for (const name of ["B 01", "B 02"]) expect(app.named(`Select mesh ${name}`).getAttribute("data-selected")).toBe("false");
+  app.get("segment-list").fire("keydown", "Escape");
+  expect(app.named("Select mesh A 01").getAttribute("data-selected")).toBe("false");
   app.panel.dispose();
 });

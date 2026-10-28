@@ -172,6 +172,10 @@
               <form id="segment-group-form">
                 <fieldset id="segment-group-tools">
                   <input id="segment-group-name" type="text" maxlength="80" required aria-label="New group name" placeholder="Group, e.g. Level 1" />
+                  <div id="segment-group-selection" class="segment-create-selection" hidden>
+                    <label class="segment-create-check"><input id="segment-group-classify" type="checkbox" /><span id="segment-group-selection-text">Classify selected elements</span></label>
+                    <label id="segment-group-layer-field">First layer name<input id="segment-group-layer-name" type="text" maxlength="80" value="Layer 1" aria-label="First layer in new group" /></label>
+                  </div>
                   <button id="segment-new-group" type="submit">+ Group</button>
                 </fieldset>
               </form>
@@ -179,6 +183,7 @@
                 <fieldset id="segment-layer-tools">
                   <input id="segment-layer-name" type="text" maxlength="80" required aria-label="New layer name" placeholder="Layer, e.g. Ceiling" />
                   <select id="segment-new-layer-group" aria-label="Group for new layer"><option value="">No group</option></select>
+                  <label id="segment-layer-selection" class="segment-create-selection segment-create-check" hidden><input id="segment-layer-classify" type="checkbox" /><span id="segment-layer-selection-text">Classify selected elements</span></label>
                   <button id="segment-new-layer" type="submit">+ Layer</button>
                 </fieldset>
               </form>
@@ -209,7 +214,7 @@
               </form>
             </dialog>
             <p id="segment-status" class="hint" role="status" hidden></p>
-            <div id="segment-list" aria-label="Layers and groups"></div>
+            <div id="segment-list" role="group" aria-label="Layers, groups and elements"></div>
             <p class="segment-session-note" hidden>Temporary · stays with this loaded scan.</p>
           </div>
         </details>
@@ -221,6 +226,7 @@
           </div>
           <div class="segment-operations">
             <button id="segment-classify" type="button" disabled>Classify</button>
+            <button id="segment-move" type="button" disabled>Move</button>
             <button id="segment-unclassify" type="button" disabled>Unclassify</button>
           </div>
         </section>

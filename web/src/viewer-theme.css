@@ -76,7 +76,7 @@ kbd, .segments-panel > summary, .segment-tree, .segment-tree .segment-tree { bor
 .segment-row:has(> input:checked), .segment-tree > summary.segment-container-selected,
 .segment-layer-row.segment-container-selected { background: var(--accent-soft); }
 .segment-tree > summary.segment-active-layer, .segment-tree > summary.segment-active-group,
-.segment-object-row:has(> input:checked), .target-layer-option[aria-selected="true"] { background: var(--accent-soft); }
+.segment-object-row[data-selected="true"], .target-layer-option[aria-selected="true"] { background: var(--accent-soft); }
 .segment-active-layer > .segment-name, .segment-active-group > .segment-name { color: var(--accent); font-weight: 600; }
 .segment-object-row[data-classified="true"] .segment-mesh-icon { color: var(--accent); }
 .segment-classification-footer .segment-operations button:first-child { color: #fff; background: var(--accent); border-color: var(--accent); }

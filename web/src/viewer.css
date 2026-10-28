@@ -617,11 +617,16 @@ kbd {
 .target-layer-option > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .segment-classification-footer .segment-operations { margin-top: 10px; gap: 8px; }
 .segment-classification-footer .segment-operations button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto; height: auto; flex: 1; padding: 8px; }
-.segment-object-row { display: flex; align-items: center; gap: 6px; margin-left: 18px; padding: 3px 0 3px 8px; }
-.segment-object-row > input[type="checkbox"], .segment-mesh-icon { flex-shrink: 0; }
+.segment-object-row { display: flex; align-items: center; gap: 6px; margin-left: 18px; padding: 3px 0 3px 8px; cursor: pointer; }
+.segment-object-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.segment-mesh-icon { flex-shrink: 0; }
 .segment-object-row .segment-mesh-icon { width: 16px; height: 16px; }
 #segment-classify-names { max-height: 50dvh; overflow: auto; }
 #segment-classify-names label { display: grid; gap: 6px; margin-bottom: 12px; }
+.segment-create-selection { flex-basis: 100%; }
+.segment-create-check { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.segment-create-check input[type="checkbox"] { flex: none !important; width: auto; }
+#segment-group-layer-field input { display: block; margin-top: 6px; }
 @container (max-width: 1160px) {
   .target-layer-window { left: auto; right: 24px; transform: none; }
   .view-actions { bottom: 220px; }
