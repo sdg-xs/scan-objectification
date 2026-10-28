@@ -37,3 +37,11 @@ it("preserves small dimensions from georeferenced IFC placements", () => {
   const asset = normalizedAsset(geometry, "z");
   expect(new Box3().setFromObject(asset).getSize(new Vector3()).length()).toBeGreaterThan(0.1);
 });
+
+it("matches the library's Y-input to Z-display conversion exactly once", () => {
+  const geometry = parseGeometry({ meshes: [{ positions: [0,0,0, 4,0,0, 4,2,0, 0,2,0, 0,0,1, 4,0,1, 4,2,1, 0,2,1], normals: Array(24).fill(0), indices: [0,1,2,0,2,3], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] });
+  const converted = new Box3().setFromObject(normalizedAsset(geometry, "y")).getSize(new Vector3());
+  expect(converted.x).toBeCloseTo(4); expect(converted.y).toBeCloseTo(1); expect(converted.z).toBeCloseTo(2);
+  const alreadyZ = new Box3().setFromObject(normalizedAsset(geometry, "z")).getSize(new Vector3());
+  expect(alreadyZ.x).toBeCloseTo(4); expect(alreadyZ.y).toBeCloseTo(2); expect(alreadyZ.z).toBeCloseTo(1);
+});

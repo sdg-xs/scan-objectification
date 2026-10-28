@@ -233,9 +233,10 @@
           <label>Category<select id="asset-library-category"><option value="">All categories</option></select></label>
           <label>Asset<select id="asset-library-choice" size="7" aria-label="Choose library asset"></select></label>
           <div class="asset-placement-options">
-            <label>Asset up axis<select id="asset-source-up"><option value="y">Y (library default)</option><option value="z">Z</option></select></label>
+            <label>Geometry input axis<select id="asset-source-up"><option value="y">Library input (Y → Z)</option><option value="z">Already Z-up</option></select></label>
             <label>Asset unit scale<select id="asset-unit-scale"><option value="1">1:1 (metres)</option><option value="0.001">Millimetres → metres</option><option value="0.01">Centimetres → metres</option></select></label>
           </div>
+          <p class="hint">Assets display Z-up, matching the library preview. Library input geometry is converted from Y-up once.</p>
           <p id="asset-assignment-status" role="status"></p>
           <div class="segment-delete-actions">
             <button id="asset-assignment-apply" type="button" disabled>Assign asset</button>

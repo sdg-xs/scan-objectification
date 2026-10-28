@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
  */
 export default defineConfig({
   root: "web",
+  // The asset IFC worker starts on demand. Discovering this dependency later
+  // changes Fragments' shared prebundle and reloads the session-only viewer.
+  optimizeDeps: { include: ["web-ifc"] },
   build: {
     outDir: "../dist",
     emptyOutDir: true,

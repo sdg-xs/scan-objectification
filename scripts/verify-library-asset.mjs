@@ -1,13 +1,17 @@
 // Read-only smoke check of the real gateway, IFC extractor and normalization without a browser.
 import { createRequire } from "node:module";
-import { dirname } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { Box3, Vector3 } from "three";
 const assetId = process.argv[2];
 if (!assetId) throw new Error("Usage: node scripts/verify-library-asset.mjs ASSET_ID");
 const require = createRequire(import.meta.url);
 const { IfcAPI } = require("web-ifc");
-const server = await createServer({ server: { middlewareMode: true }, appType: "custom" });
+const cacheDir = await mkdtemp(join(tmpdir(), "nemy-asset-check-"));
+const server = await createServer({ cacheDir, server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom" });
 const api = new IfcAPI();
 let model;
 try {
@@ -35,4 +39,6 @@ try {
 } finally {
   if (model !== undefined) { api.CloseModel(model); api.Dispose(); }
   await server.close();
+  assert.equal(dirname(resolve(cacheDir)), resolve(tmpdir()));
+  await rm(cacheDir, { recursive: true, force: true });
 }

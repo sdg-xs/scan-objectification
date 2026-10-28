@@ -49,7 +49,7 @@ After SAM adds elements, the viewer records each selection’s bounding center a
 
 1. Click **Assign asset** (cube-plus icon immediately before the eye) on an element row or layer row. A layer targets all its current elements; an element targets only itself.
 2. Search the existing asset-library catalog by name/category and choose the reusable definition. Expand Recorded element poses to inspect coordinates and detected Z angles. Geometry is resolved on demand from saved mesh data or a representative IFC/source reference.
-3. Leave Asset up axis at Y for normal library/IFC geometry; choose Z for a Z-up uploaded mesh. Library IFC geometry is already in metres; use 1:1. For imported meshes authored in millimetres/centimetres, choose the matching unit scale. Geometry is centered and its dominant horizontal direction becomes the asset’s X direction; it is never stretched to the detection bounds.
+3. Leave Geometry input axis at **Library input (Y → Z)** for normal library/IFC geometry; choose **Already Z-up** only for geometry already stored in that orientation. Both the updated library preview and this viewer display Z-up; the library update changes display orientation without rewriting stored Y-up geometry. Library IFC geometry is already in metres; use 1:1. For imported meshes authored in millimetres/centimetres, choose the matching unit scale. Geometry is centered and its dominant horizontal direction becomes the asset’s X direction; it is never stretched to the detection bounds.
 4. Choose **Assign asset**. Each target gets one occurrence at its own recorded pose. Assignment replaces its prior asset, preserves the original scan, and follows group/layer/element visibility and the section box.
 5. Reopen the element’s Assign asset window, enter **Z rotation correction**, and choose **Update existing asset rotation**. This changes only the asset offset, keeping the detected angle. At layer level, the correction applies to existing assigned assets throughout that layer. Use 180° to reverse a linear asset’s direction.
 
@@ -125,4 +125,10 @@ Verified in Chrome with `BS17-IFC.ifc` (24.3 MB) and `BS17-PLY.ply` (325 MB; 4,7
 npm.cmd test -- --run
 npm.cmd run typecheck
 npm.cmd run build
+```
+
+Development-mode asset assignment: Vite pre-optimizes `web-ifc` at startup. Without that explicit entry, the first on-demand asset IFC worker changes the shared Fragments prebundle and forces a full-page reload, discarding session-only scan/layer state. The smoke verifier uses an isolated temporary Vite cache so it cannot invalidate the active development cache. Source/config edits can still reload development mode as expected; the production viewer at `http://127.0.0.1:8767/viewer.html` has no HMR.
+
+```powershell
+node.exe --test scripts/test-asset-worker-reload.mjs
 ```
