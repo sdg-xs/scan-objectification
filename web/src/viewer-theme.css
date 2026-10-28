@@ -1,0 +1,96 @@
+@import "./design-system-fonts.css";
+
+/* asset.library palette and typography; geometry and spacing stay in viewer.css. */
+:root {
+  font-family: "Poppins", Arial, sans-serif;
+  color-scheme: light;
+  color: #172033;
+  background: #f7faff;
+  --page-bg: #f7faff;
+  --surface: #fff;
+  --ink: #172033;
+  --header-bg: #002340;
+  --accent: #1769e0;
+  --accent-hover: #125ac1;
+  --accent-soft: #eaf1ff;
+  --muted: #667085;
+  --line: #e3e8ef;
+}
+.workspace, .eyebrow, .triple label, .view-label, kbd, .crosshair, .view-footer { font-family: inherit; }
+button, .segments-panel button {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+}
+button:hover:not(:disabled), .classification-toggle:hover,
+.segments-panel .classification-icon-button:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #b9c5d3;
+}
+.topbar { background: var(--header-bg); color: #fff; border-color: var(--accent); }
+.brand span { color: #f2b800; }
+.workspace { color: #ffffffb3; }
+.badge { color: #fff; border-color: #ffffff40; }
+.sidebar, .light-dialog, .segments-panel, .segment-dialog {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.eyebrow, .segment-count, .segment-create > summary { color: var(--accent); }
+.toggle, .text-button, .axis-select, .scale-label, .field-caption, .triple label,
+.privacy, .segment-target-label, .segment-splats, .segment-session-note,
+.classification-toggle, .view-label, .view-label span { color: var(--muted); }
+.file-button { background: var(--accent-soft); border-color: #d8e3f2; }
+input[type="number"], select, .sam-prompt-row input,
+.segments-panel input:not([type="checkbox"]), .segments-panel select {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+}
+.apply, .segment-operations button:first-child {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.apply:hover:not(:disabled), .segment-operations button:first-child:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+#viewport { background: #000; }
+.light-image-frame { background: var(--page-bg); }
+.section-tools, .view-actions > button, .view-footer {
+  background: #fffffff2;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.section-actions button[aria-pressed="true"], #asset-draw[aria-pressed="true"],
+.segment-tree button[aria-pressed="true"], .classification-toggle:has(input:checked) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: #d8e3f2;
+}
+kbd, .segments-panel > summary, .segment-tree, .segment-tree .segment-tree { border-color: var(--line); }
+.segment-tree > summary > span { color: var(--ink); }
+.segment-tree > summary::before { color: var(--muted); }
+.segments-panel .segment-name { background: transparent; border-color: transparent; }
+.segments-panel .segment-name:hover, .segments-panel .segment-name:focus { border-color: #b9c5d3; }
+.segment-row:has(> input:checked), .segment-tree > summary.segment-container-selected,
+.segment-layer-row.segment-container-selected { background: var(--accent-soft); }
+.segment-tree > summary.segment-active-layer, .segment-tree > summary.segment-active-group,
+.segment-object-row[data-selected="true"], .target-layer-option[aria-selected="true"] { background: var(--accent-soft); }
+.segment-active-layer > .segment-name, .segment-active-group > .segment-name { color: var(--accent); font-weight: 600; }
+.segment-object-row[data-classified="true"] .segment-mesh-icon { color: var(--accent); }
+.segment-classification-footer .segment-operations button:first-child { color: #fff; background: var(--accent); border-color: var(--accent); }
+.segment-classification-footer .segment-operations button:first-child:hover:not(:disabled) { background: var(--accent-hover); }
+.segment-classification-footer button:disabled { opacity: .45; }
+#segment-name-error, #segment-create-error { color: #a53e36; }
+.segment-delete-actions button[type="submit"] { background: #a53e36; border-color: #a53e36; color: #fff; }
+.segment-delete-actions button[type="submit"]:hover { background: #8f342d; }
+#empty-state h2 { color: #e3e8ef; }
+.crosshair { color: #b9c5d3; }
+.file-status[data-error="true"], #light-status[data-error="true"] { color: #a53e36; }
+#viewer-error { background: #fff1ee; color: #a53e36; border-color: #edc3bc; }
+
+.segment-asset-row[data-selected="true"] { background: var(--accent-soft); }
+.segment-object-row[data-linked="true"], .segment-asset-row[data-linked="true"] { box-shadow: inset 2px 0 var(--accent); }
+.segments-panel .segment-asset-name { color: var(--accent); }
+#segment-asset-selection-count { color: var(--muted); }

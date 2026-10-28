@@ -1,0 +1,686 @@
+import type { Segment } from "./segments-model";
+import { readFileSync } from "node:fs";
+import { afterEach, expect, it, vi } from "vitest";
+import { SegmentPanel } from "./segments";
+
+vi.mock("@sparkjsdev/spark", () => ({ dyno: { dynoBlock: vi.fn(() => ({})), Gsplat: {} }, readRgbaArray: vi.fn(), SplatMesh: class {} }));
+vi.mock("./asset-selection", () => ({ createSelectionTexture: (count: number) => ({ array: new Uint8Array(count * 4), dispose: vi.fn(), dyno: {} }) }));
+
+// Minimal DOM boundary for exercising real panel event handlers, not a second panel implementation.
+class Control extends EventTarget {
+  children: Control[] = [];
+  parent: Control | undefined;
+  dataset: Record<string, string> = {};
+  attributes = new Map<string, string>();
+  value = "";
+  textContent = "";
+  className = "";
+  title = "";
+  disabled = false;
+  hidden = false;
+  checked = false;
+  open = false;
+  focused = false;
+  popoverOpen = false;
+  style: Record<string, string> = {};
+  constructor(readonly tag = "div") { super(); }
+  classList = {
+    contains: (name: string) => this.className.split(" ").includes(name),
+    add: (name: string) => { this.className += ` ${name}`; },
+    toggle: (name: string, on: boolean) => {
+      this.className = this.className.split(" ").filter(value => value && value !== name).concat(on ? [name] : []).join(" ");
+    },
+  };
+  append(...children: Control[]): void { for (const child of children) { child.parent = this; this.children.push(child); } }
+  replaceChildren(...children: Control[]): void { for (const child of this.children) child.parent = undefined; this.children = []; this.append(...children); }
+  add(child: Control): void { this.append(child); }
+  setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
+  getAttribute(name: string): string | null { return this.attributes.get(name) ?? null; }
+  get firstElementChild(): Control | undefined { return this.children[0]; }
+  closest(selector: string): Control | null {
+    for (let item: Control | undefined = this; item; item = item.parent) if (item.matches(selector)) return item;
+    return null;
+  }
+  focus(): void { this.focused = true; this.fire("focusin"); }
+  showModal(): void { this.open = true; }
+  showPopover(): void { this.popoverOpen = true; }
+  hidePopover(): void { this.popoverOpen = false; }
+  getBoundingClientRect(): { left: number; top: number; width: number } { return { left: 24, top: 300, width: 300 }; }
+  scrollIntoView(): void {}
+  contains(node: Control): boolean { return this === node || this.children.some(child => child.contains(node)); }
+  click(): void { this.fire("click"); }
+  close(): void {
+    if (!this.open) return;
+    this.open = false;
+    queueMicrotask(() => this.dispatchEvent(new Event("close")));
+  }
+  fire(type: string, key?: string, modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {}): void {
+    if (type === "click" && this.disabled) return;
+    const event = new Event(type, { cancelable: true, bubbles: true });
+    Object.defineProperty(event, "target", { value: this });
+    if (key) Object.defineProperty(event, "key", { value: key });
+    for (const [name, value] of Object.entries(modifiers)) Object.defineProperty(event, name, { value });
+    const path: Control[] = [];
+    for (let item: Control | undefined = this; item; item = item.parent) path.push(item);
+    for (const item of path) { item.dispatchEvent(event); if (event.cancelBubble) break; }
+  }
+  querySelectorAll(selector: string): Control[] {
+    return this.children.flatMap(child => [
+      ...(child.matches(selector) ? [child] : []),
+      ...child.querySelectorAll(selector),
+    ]);
+  }
+  querySelector(selector: string): Control | null { return this.querySelectorAll(selector)[0] ?? null; }
+  private matches(selector: string): boolean {
+    if (selector === "details:not([open])") return this.tag === "details" && !this.open;
+    const attribute = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(selector);
+    if (attribute) {
+      const key = attribute[1]!;
+      const value = key.startsWith("data-") ? this.dataset[key.slice(5).replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())] : this.attributes.get(key);
+      return value !== undefined && (attribute[2] === undefined || value === attribute[2]);
+    }
+    return selector.startsWith(".") ? this.classList.contains(selector.slice(1)) : this.tag === selector;
+  }
+}
+
+function workspace() {
+  const html = readFileSync(new URL("../viewer.html", import.meta.url), "utf8");
+  const controls = new Map<string, Control>();
+  const documentNode = new Control("document");
+  const stack = [documentNode];
+  const voidTags = new Set(["input", "img", "meta", "link", "br", "hr"]);
+  for (const match of html.matchAll(/<\/?([\w-]+)\b([^>]*)>/g)) {
+    if (match[0].startsWith("</")) { stack.pop(); continue; }
+    const item = new Control(match[1]);
+    for (const attribute of match[2]!.matchAll(/([\w-]+)="([^"]*)"/g)) item.setAttribute(attribute[1]!, attribute[2]!);
+    item.className = item.getAttribute("class") ?? "";
+    item.value = item.getAttribute("value") ?? "";
+    item.disabled = /\bdisabled\b/.test(match[2]!);
+    item.checked = /\bchecked\b/.test(match[2]!);
+    item.hidden = /\bhidden\b/.test(match[2]!);
+    item.open = /\bopen\b/.test(match[2]!);
+    stack.at(-1)!.append(item);
+    const id = item.getAttribute("id");
+    if (id) controls.set(id, item);
+    if (!voidTags.has(match[1]!) && !match[2]!.endsWith("/")) stack.push(item);
+  }
+  const get = (id: string): Control => {
+    const item = controls.get(id);
+    if (!item) throw new Error(`Missing fixture control ${id}`);
+    return item;
+  };
+  vi.stubGlobal("document", Object.assign(documentNode, {
+    querySelector: (selector: string) => get(selector.slice(1)),
+    createElement: (tag: string) => new Control(tag),
+    createElementNS: (_namespace: string, tag: string) => new Control(tag),
+  }));
+  for (const type of ["HTMLInputElement", "HTMLButtonElement", "HTMLElement", "Node"]) vi.stubGlobal(type, Control);
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { innerWidth: 1000, innerHeight: 800 }));
+  vi.stubGlobal("Option", class extends Control {
+    constructor(text: string, value: string) { super("option"); this.textContent = text; this.value = value; }
+  });
+  const errors = vi.fn();
+  const assignAssets = vi.fn();
+  const clear = vi.fn();
+  const syncAssets = vi.fn();
+  const panel = new SegmentPanel({ select: vi.fn(), clear, error: errors, assignAssets, syncAssets });
+  const descendants = (node: Control): Control[] => node.children.flatMap(child => [child, ...descendants(child)]);
+  const named = (label: string, root = "segment-list"): Control => {
+    const item = descendants(get(root)).find(item => item.attributes.get("aria-label") === label);
+    if (!item) throw new Error(`Missing rendered control ${label}`);
+    return item;
+  };
+  const create = (kind: "group" | "layer", name: string): void => {
+    get(`segment-add-${kind}`).fire("click");
+    get(`segment-${kind}-name`).value = name;
+    get(`segment-${kind}-form`).fire("submit");
+  };
+  return { get, panel, named, create, errors, documentNode, assignAssets, clear, syncAssets };
+}
+
+afterEach(() => { vi.unstubAllGlobals(); });
+
+it("allows groups and layers to be created before a scan is loaded", () => {
+  const app = workspace();
+  expect(app.get("segment-add-group").disabled).toBe(false);
+  expect(app.get("segment-add-layer").disabled).toBe(false);
+  expect(app.get("segment-group-tools").disabled).toBe(false);
+  expect(app.get("segment-layer-tools").disabled).toBe(false);
+  app.create("group", "Electrical");
+  expect(app.named("Group name Electrical").value).toBe("Electrical");
+  expect(app.get("segment-delete").disabled).toBe(false);
+  app.create("layer", "Lighting");
+  expect(app.named("Layer name Lighting").value).toBe("Lighting");
+  expect(app.get("segment-create-dialog").open).toBe(false);
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("reveals newly created items when the filter hides them", () => {
+  const app = workspace();
+  app.get("segment-filter").value = "unrelated";
+  app.get("segment-filter").fire("input");
+  app.create("group", "MEP");
+  expect(app.get("segment-filter").value).toBe("");
+  expect(app.named("Group name MEP").value).toBe("MEP");
+  app.create("layer", "Pipes");
+  expect(app.named("Layer name Pipes").value).toBe("Pipes");
+  expect(app.named("Set active layer Pipes").attributes.get("aria-pressed")).toBe("true");
+  app.panel.dispose();
+});
+
+it("supports cancelling and confirming deletion without a scan", async () => {
+  const app = workspace();
+  app.create("group", "MEP");
+  app.create("layer", "Lighting");
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-dialog").open).toBe(true);
+  app.get("segment-delete-cancel").fire("click");
+  await Promise.resolve();
+  expect(app.named("Layer name Lighting").value).toBe("Lighting");
+  app.get("segment-delete").fire("click");
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Layer name Lighting")).toThrow();
+  expect(app.named("Group name MEP").value).toBe("MEP");
+  expect(app.get("segment-delete").disabled).toBe(true);
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("keeps a prepared hierarchy when the first scan attaches", () => {
+  const app = workspace();
+  app.create("group", "MEP");
+  app.create("layer", "Lighting");
+  // GPU-backed fields are not touched when attaching a scan to an empty hierarchy.
+  const mesh = { numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0];
+  app.panel.setScan(mesh);
+  expect(app.named("Group name MEP").value).toBe("MEP");
+  expect(app.named("Layer name Lighting").value).toBe("Lighting");
+  app.panel.setScan(undefined);
+  expect(() => app.named("Group name MEP")).toThrow();
+  expect(app.get("segment-add-group").disabled).toBe(false);
+  app.panel.dispose();
+});
+
+it("deletes a selected group and its layers after confirmation", () => {
+  const app = workspace();
+  app.create("group", "MEP");
+  app.create("layer", "Lighting");
+  app.named("Group name MEP").focus();
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-description").textContent).toContain("removes 1 layers");
+  expect(app.get("segment-delete-destination").children.map(item => item.textContent)).toEqual(["Unassign to Unclassified"]);
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Group name MEP")).toThrow();
+  expect(() => app.named("Layer name Lighting")).toThrow();
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("offers only surviving destination layers when deleting a group", () => {
+  const app = workspace();
+  app.create("group", "Old");
+  app.create("layer", "Lighting");
+  app.create("group", "Keep");
+  app.create("layer", "Fixtures");
+  app.named("Group name Old").focus();
+  app.get("segment-delete").fire("click");
+  const destination = app.get("segment-delete-destination");
+  expect(destination.children.map(item => item.textContent)).toEqual(["Unassign to Unclassified", "Assign to Keep / Fixtures"]);
+  destination.value = destination.children[1]!.value;
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Layer name Lighting")).toThrow();
+  expect(app.named("Layer name Fixtures").value).toBe("Fixtures");
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("reports blank names inside the creation dialog and allows correction", () => {
+  const app = workspace();
+  app.create("group", "   ");
+  expect(app.get("segment-create-dialog").open).toBe(true);
+  expect(app.get("segment-create-error").hidden).toBe(false);
+  expect(app.get("segment-create-error").textContent).toBe("Enter a group name.");
+  app.get("segment-group-name").value = "MEP";
+  app.get("segment-group-form").fire("submit");
+  expect(app.named("Group name MEP").value).toBe("MEP");
+  expect(app.get("segment-create-dialog").open).toBe(false);
+  app.panel.dispose();
+});
+
+it("ignores an old close event after deletion is cancelled and immediately reopened", async () => {
+  const app = workspace();
+  app.create("group", "MEP");
+  app.get("segment-delete").fire("click");
+  app.get("segment-delete-cancel").fire("click");
+  app.get("segment-delete").fire("click");
+  await Promise.resolve();
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Group name MEP")).toThrow();
+  app.panel.dispose();
+});
+
+it("opens the bottom target picker and reflects its choice in the layer and parent group", () => {
+  const app = workspace();
+  app.create("group", "Electrical");
+  app.create("layer", "Lighting");
+  app.create("group", "Architecture");
+  app.create("layer", "Ceiling");
+  app.get("segment-target").fire("click");
+  expect(app.get("segment-target-options").hidden).toBe(false);
+  app.named("Use target layer Electrical / Lighting", "segment-target-options").fire("click");
+  expect(app.get("segment-target-options").hidden).toBe(true);
+  expect(app.get("segment-target-label").textContent).toBe("Electrical / Lighting");
+  expect(app.named("Set active layer Lighting").attributes.get("aria-pressed")).toBe("true");
+  expect(app.named("Group name Electrical").parent?.classList.contains("segment-active-group")).toBe(true);
+  expect(app.named("Layer name Lighting").parent?.classList.contains("segment-active-layer")).toBe(true);
+  app.panel.dispose();
+});
+
+it("keeps target controls outside Model Browser and reveals it when a target is chosen", () => {
+  const app = workspace();
+  expect(app.get("segments-panel").contains(app.get("segment-target-picker"))).toBe(false);
+  app.create("layer", "Lighting");
+  app.get("segments-panel").open = false;
+  app.get("segment-target").fire("click");
+  app.named("Use target layer Lighting", "segment-target-options").fire("click");
+  expect(app.get("segments-panel").open).toBe(true);
+  app.panel.dispose();
+});
+
+it("dismisses target choices on Escape and outside click", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.get("segment-target").fire("click");
+  app.get("segment-target-options").fire("keydown", "Escape");
+  expect(app.get("segment-target-options").hidden).toBe(true);
+  app.get("segment-target").fire("click");
+  app.documentNode.fire("pointerdown");
+  expect(app.get("segment-target-options").hidden).toBe(true);
+  app.panel.dispose();
+});
+
+it("prompts for names, classifies under the target layer and unclassifies checked meshes", () => {
+  const app = workspace();
+  app.create("group", "Electrical");
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 3 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2, 0]), "light");
+  app.get("segment-classify").fire("click");
+  expect(app.get("segment-name-dialog").open).toBe(true);
+  expect(app.named("Name for mesh 1", "segment-classify-names").value).toBe("Lighting 01");
+  expect(app.named("Name for mesh 2", "segment-classify-names").value).toBe("Lighting 02");
+  app.named("Name for mesh 1", "segment-classify-names").value = "Linear fixture";
+  app.named("Name for mesh 2", "segment-classify-names").value = "Bulb";
+  app.get("segment-name-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(false);
+  expect(app.named("Mesh name Linear fixture").parent?.dataset.classified).toBe("true");
+  expect(app.named("Mesh name Bulb").parent?.dataset.classified).toBe("true");
+  app.named("Select mesh Linear fixture").fire("click");
+  app.get("segment-unclassify").fire("click");
+  expect(app.named("Mesh name Linear fixture").parent?.dataset.classified).toBe("false");
+  expect(app.named("Mesh name Bulb").parent?.dataset.classified).toBe("true");
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("cancelling the naming prompt leaves selected meshes unclassified", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-cancel").fire("click");
+  expect(app.named("Mesh name light 1").parent?.dataset.classified).toBe("false");
+  app.panel.dispose();
+});
+
+it("navigates target choices by keyboard and opens outside panel clipping", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.create("layer", "Furniture");
+  app.get("segment-target").getBoundingClientRect = () => ({ left: 24, top: 120, width: 300 });
+  app.get("segment-target").fire("keydown", "ArrowUp");
+  const popup = app.get("segment-target-options");
+  expect(popup.getAttribute("popover")).toBe("manual");
+  expect(popup.popoverOpen).toBe(true);
+  expect(popup.style.maxHeight).toBe("104px");
+  expect(popup.style.bottom).toBe("688px");
+  const lighting = app.named("Use target layer Lighting", "segment-target-options");
+  lighting.fire("keydown", "Enter");
+  expect(app.get("segment-target-label").textContent).toBe("Lighting");
+  expect(popup.popoverOpen).toBe(false);
+  app.panel.dispose();
+});
+
+it("continues numbered defaults for later SAM selections", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 0]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  expect(app.named("Mesh name Lighting 01").parent?.dataset.classified).toBe("true");
+  app.panel.add(new Uint8Array([0, 1]), "light");
+  app.get("segment-classify").fire("click");
+  expect(app.named("Name for mesh 1", "segment-classify-names").value).toBe("Lighting 02");
+  app.panel.dispose();
+});
+
+it("rejects blank names without consuming numbers and cancels naming on a new source", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-classify").fire("click");
+  app.named("Name for mesh 1", "segment-classify-names").value = " ";
+  app.get("segment-name-form").fire("submit");
+  expect(app.get("segment-name-error").hidden).toBe(false);
+  expect(app.named("Mesh name light 1").parent?.dataset.classified).toBe("false");
+  app.get("segment-name-cancel").fire("click");
+  app.get("segment-classify").fire("click");
+  expect(app.named("Name for mesh 1", "segment-classify-names").value).toBe("Lighting 01");
+  app.panel.setScan(undefined);
+  expect(app.get("segment-name-dialog").open).toBe(false);
+  app.get("segment-name-form").fire("submit");
+  expect(app.get("segment-target-label").textContent).toBe("Choose target layer…");
+  app.panel.dispose();
+});
+
+it("moves a checked element to the chosen target without opening naming", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  app.named("Select mesh Lighting 01").fire("click");
+  expect(app.get("segment-move").disabled).toBe(true);
+  app.create("layer", "Fixtures");
+  expect(app.get("segment-move").disabled).toBe(false);
+  app.get("segment-move").fire("click");
+  expect(app.get("segment-name-dialog").open).toBe(false);
+  const destination = app.named("Layer name Fixtures").parent?.parent;
+  expect(destination?.contains(app.named("Mesh name Lighting 01"))).toBe(true);
+  app.panel.dispose();
+});
+
+it("creates a layer for selected Unclassified elements and offers numbered naming", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-add-layer").fire("click");
+  expect(app.get("segment-layer-classify").checked).toBe(true);
+  app.get("segment-layer-name").value = "Lighting";
+  app.get("segment-layer-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(true);
+  expect(app.named("Name for mesh 1", "segment-classify-names").value).toBe("Lighting 01");
+  app.get("segment-name-form").fire("submit");
+  expect(app.named("Layer name Lighting").parent?.parent?.contains(app.named("Mesh name Lighting 01"))).toBe(true);
+  app.panel.dispose();
+});
+
+it("creates a group and first layer for selected Unclassified elements", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "light");
+  app.get("segment-add-group").fire("click");
+  expect(app.get("segment-group-classify").checked).toBe(true);
+  app.get("segment-group-name").value = "Electrical";
+  app.get("segment-group-layer-name").value = "Lighting";
+  app.get("segment-group-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(true);
+  app.get("segment-name-form").fire("submit");
+  const group = app.named("Group name Electrical").parent?.parent;
+  expect(group?.contains(app.named("Layer name Lighting"))).toBe(true);
+  expect(group?.contains(app.named("Mesh name Lighting 01"))).toBe(true);
+  app.panel.dispose();
+});
+
+it("selects rows with click, Control-click and Shift-click instead of selection checkboxes", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 4 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2, 3, 4]), "part");
+  const row = (index: number): Control => app.named(`Select mesh part ${index}`);
+  expect(row(1).children[0]!.tag).toBe("svg");
+  row(1).fire("click");
+  expect([1, 2, 3, 4].map(index => row(index).getAttribute("data-selected"))).toEqual(["true", "false", "false", "false"]);
+  row(3).fire("click", undefined, { ctrlKey: true });
+  expect([1, 2, 3, 4].map(index => row(index).getAttribute("data-selected"))).toEqual(["true", "false", "true", "false"]);
+  row(3).fire("click", undefined, { ctrlKey: true });
+  expect(row(3).getAttribute("data-selected")).toBe("false");
+  row(1).fire("click");
+  row(4).fire("click", undefined, { shiftKey: true });
+  expect([1, 2, 3, 4].map(index => row(index).getAttribute("data-selected"))).toEqual(["true", "true", "true", "true"]);
+  app.panel.dispose();
+});
+
+it("keeps selected elements Unclassified when creation assignment is unchecked", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "part");
+  app.get("segment-add-layer").fire("click");
+  app.get("segment-layer-classify").checked = false;
+  app.get("segment-layer-name").value = "Later";
+  app.get("segment-layer-form").fire("submit");
+  expect(app.get("segment-name-dialog").open).toBe(false);
+  expect(app.named("Mesh name part 1").parent?.dataset.classified).toBe("false");
+  app.panel.dispose();
+});
+
+it("validates the first layer before creating a group for selected elements", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "part");
+  app.get("segment-add-group").fire("click");
+  app.get("segment-group-name").value = "Electrical";
+  app.get("segment-group-layer-name").value = " ";
+  app.get("segment-group-form").fire("submit");
+  expect(app.get("segment-create-dialog").open).toBe(true);
+  expect(() => app.named("Group name Electrical")).toThrow();
+  expect(app.get("segment-create-error").textContent).toBe("Enter a first layer name.");
+  app.panel.dispose();
+});
+
+it("Shift range selection skips elements inside collapsed layers", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 5 } as Parameters<SegmentPanel["setScan"]>[0]);
+  for (const [name, labels] of [
+    ["A", [1, 2, 0, 0, 0]], ["B", [0, 0, 1, 2, 0]], ["C", [0, 0, 0, 0, 1]],
+  ] as const) {
+    app.create("layer", name);
+    app.panel.add(new Uint8Array(labels), "part");
+    app.get("segment-classify").fire("click");
+    app.get("segment-name-form").fire("submit");
+  }
+  app.named("Layer name B").parent!.parent!.open = false;
+  app.named("Select mesh A 01").fire("click");
+  app.named("Select mesh C 01").fire("click", undefined, { shiftKey: true });
+  for (const name of ["A 01", "A 02", "C 01"]) expect(app.named(`Select mesh ${name}`).getAttribute("data-selected")).toBe("true");
+  for (const name of ["B 01", "B 02"]) expect(app.named(`Select mesh ${name}`).getAttribute("data-selected")).toBe("false");
+  app.get("segment-list").fire("keydown", "Escape");
+  expect(app.named("Select mesh A 01").getAttribute("data-selected")).toBe("false");
+  app.panel.dispose();
+});
+
+it("removes selected element records after confirmation while preserving the source scan", async () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 3 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2, 3]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  app.named("Select mesh Lighting 01").fire("click");
+  app.named("Select mesh Lighting 03").fire("click", undefined, { ctrlKey: true });
+  expect(app.get("segment-delete").disabled).toBe(false);
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-title").textContent).toContain("2 elements");
+  expect(app.get("segment-delete-description").textContent).toContain("geometry is preserved");
+  expect(app.get("segment-delete-assignment").hidden).toBe(true);
+  app.get("segment-delete-cancel").fire("click");
+  await Promise.resolve();
+  expect(app.named("Mesh name Lighting 01").value).toBe("Lighting 01");
+  app.get("segment-delete").fire("click");
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Mesh name Lighting 01")).toThrow();
+  expect(() => app.named("Mesh name Lighting 03")).toThrow();
+  expect(app.named("Mesh name Lighting 02").value).toBe("Lighting 02");
+  expect(app.named("Layer name Lighting").value).toBe("Lighting");
+  app.named("Layer name Lighting").focus();
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-assignment").hidden).toBe(false);
+  app.get("segment-delete-cancel").fire("click");
+  expect(app.panel.visibility()).toBeUndefined();
+  // Source indices remain available for subsequent detection.
+  app.panel.add(new Uint8Array([1, 0, 1]), "detected again");
+  expect(app.named("Mesh name detected again 1").value).toBe("detected again 1");
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("removes Unclassified records and cancels pending element deletion on new SAM results", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 0]), "old");
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-dialog").open).toBe(true);
+  app.panel.add(new Uint8Array([0, 1]), "new");
+  expect(app.get("segment-delete-dialog").open).toBe(false);
+  app.get("segment-delete-form").fire("submit");
+  expect(app.named("Mesh name old 1").value).toBe("old 1");
+  app.get("segment-delete").fire("click");
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Mesh name new 1")).toThrow();
+  expect(app.named("Mesh name old 1").value).toBe("old 1");
+  app.panel.dispose();
+});
+
+it("discards pending element deletion when the source is replaced", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "old");
+  app.get("segment-delete").fire("click");
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.get("segment-delete-form").fire("submit");
+  expect(app.get("segment-delete-dialog").open).toBe(false);
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("assigns at element and layer scope with assignment last on the layer row", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  const button = app.named("Assign asset to element Lighting 01");
+  expect(button.parent?.children.at(-2)).toBe(button);
+  button.fire("click");
+  expect(app.assignAssets.mock.lastCall?.[0].map((row: { name: string }) => row.name)).toEqual(["Lighting 01"]);
+  const layer = app.named("Assign asset to layer Lighting");
+  expect(layer.parent?.children.at(-1)).toBe(layer);
+  layer.fire("click");
+  expect(app.assignAssets.mock.lastCall?.[0]).toHaveLength(2);
+  app.panel.dispose();
+});
+
+function assignedRows(app: ReturnType<typeof workspace>, count = 3): Segment[] {
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: count, updateVersion() {} } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(Uint8Array.from({ length: count }, (_, i) => i + 1), "light");
+  app.get("segment-classify").fire("click"); app.get("segment-name-form").fire("submit");
+  app.named("Assign asset to layer Lighting").fire("click");
+  const rows: Segment[] = app.assignAssets.mock.lastCall![0];
+  for (const row of rows) row.asset = { id: "lamp", name: "Linear-Light", correctionZ: 0, scale: 1 };
+  app.panel.assetsChanged(); return rows;
+}
+
+it("shows asset child rows and keeps scan and asset master toggles before layer colors", () => {
+  const app = workspace(), rows = assignedRows(app);
+  expect(app.named("Asset name for Lighting 01").textContent).toBe("Linear-Light");
+  const tools = app.get("segment-colors").parent!.parent!;
+  expect(tools.children.indexOf(app.get("segment-scan-visible").parent!)).toBeLessThan(tools.children.indexOf(app.get("segment-colors").parent!));
+  expect(tools.children.indexOf(app.get("segment-assets-visible").parent!)).toBeLessThan(tools.children.indexOf(app.get("segment-colors").parent!));
+  app.get("segment-scan-visible").checked = false; app.get("segment-scan-visible").fire("change");
+  expect([...app.panel.visibility()!]).toEqual([0,0,0]);
+  expect(rows.every(row => row.asset!.visible !== false)).toBe(true);
+  app.named("Show asset for Lighting 01").checked = false; app.named("Show asset for Lighting 01").fire("change");
+  expect(rows[0]!.asset!.visible).toBe(false); expect(rows[0]!.visible).toBe(true);
+  app.panel.dispose();
+});
+it("selects asset rows with Ctrl and Shift then applies bulk visibility/color", () => {
+  const app = workspace(), rows = assignedRows(app);
+  app.named("Select asset for Lighting 01").fire("click");
+  app.named("Select asset for Lighting 03").fire("click", undefined, { ctrlKey: true });
+  app.get("segment-assets-hide").fire("click");
+  expect(rows.map(row => row.asset!.visible)).toEqual([false, undefined, false]);
+  app.named("Select asset for Lighting 01").fire("click");
+  app.named("Select asset for Lighting 03").fire("click", undefined, { shiftKey: true });
+  app.get("segment-assets-color").value = "#ff0000"; app.get("segment-assets-color").fire("input");
+  expect(rows.every(row => row.asset!.color === "#ff0000")).toBe(true);
+  expect(app.get("segment-asset-colors").value).toBe("custom");
+  app.get("segment-assets-show").fire("click"); expect(rows.every(row => row.asset!.visible)).toBe(true);
+  app.panel.dispose();
+});
+it("selects all assets, opens one asset settings scope and deletes assignments only", () => {
+  const app = workspace(), rows = assignedRows(app);
+  app.get("segment-assets-all").fire("click");
+  expect(app.get("segment-asset-selection-count").textContent).toContain("3 assets");
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-description").textContent).toContain("scan elements");
+  app.get("segment-delete-form").fire("submit");
+  expect(rows.every(row => !row.asset)).toBe(true);
+  expect(app.named("Mesh name Lighting 01").value).toBe("Lighting 01");
+  rows[0]!.asset = { id: "lamp", name: "Linear-Light", correctionZ: 0, scale: 1 };
+  app.panel.assetsChanged(); app.named("Assign asset to element Lighting 01").fire("click");
+  expect(app.assignAssets.mock.lastCall![0]).toEqual([rows[0]]);
+  app.panel.dispose();
+});
+
+
+it("preserves selection when isolation temporarily synchronizes scan visibility", () => {
+  const app = workspace(); assignedRows(app);
+  app.named("Select asset for Lighting 01").fire("click");
+  app.clear.mockClear();
+  app.panel.setScanVisibility(false, { preserveSelection: true });
+  app.panel.setScanVisibility(true, { preserveSelection: true });
+  expect(app.clear).not.toHaveBeenCalled();
+  expect(app.get("segment-asset-selection-count").textContent).toContain("1 asset");
+  app.panel.setScanVisibility(false);
+  expect(app.clear).toHaveBeenCalledOnce();
+  app.panel.dispose();
+});
+
+it("orders layer controls and separates their scan and asset colors/visibility", () => {
+  const app = workspace(), rows = assignedRows(app);
+  const name = app.named("Layer name Lighting"), heading = name.parent!;
+  const ordered = [name, app.named("Set active layer Lighting"), app.named("Show scans in layer Lighting").parent!, app.named("Scan color of layer Lighting"), app.named("Show assets in layer Lighting").parent!, app.named("Asset color of layer Lighting"), app.named("Assign asset to layer Lighting")];
+  expect(heading.children.slice(-7)).toEqual(ordered);
+  app.named("Show scans in layer Lighting").checked = false;
+  app.named("Show scans in layer Lighting").fire("change");
+  expect([...app.panel.visibility()!]).toEqual([0,0,0]);
+  let call = app.syncAssets.mock.lastCall!;
+  expect(rows.every(row => call[1](row))).toBe(true);
+  app.named("Show assets in layer Lighting").checked = false;
+  app.named("Show assets in layer Lighting").fire("change");
+  call = app.syncAssets.mock.lastCall!;
+  expect(rows.every(row => !call[1](row))).toBe(true);
+  expect(rows.every(row => row.visible && row.asset!.visible !== false)).toBe(true);
+  app.named("Asset color of layer Lighting").value = "#ff0000";
+  app.named("Asset color of layer Lighting").fire("input");
+  expect(app.get("segment-asset-colors").value).toBe("layer");
+  expect([...app.syncAssets.mock.lastCall![2].layerColors.values()]).toEqual(["#ff0000"]);
+  app.named("Scan color of layer Lighting").value = "#00ff00";
+  app.named("Scan color of layer Lighting").fire("input");
+  expect(app.get("segment-colors").checked).toBe(true);
+  expect(app.named("Asset color of layer Lighting").value).toBe("#ff0000");
+  const child = app.named("Select asset for Lighting 01");
+  expect(child.querySelectorAll("button")).toHaveLength(0);
+  expect(child.querySelectorAll("input")).toHaveLength(1);
+  expect(() => app.named("Color asset for Lighting 01")).toThrow();
+  app.assignAssets.mockClear();
+  app.named("Asset name for Lighting 01").fire("click");
+  expect(app.assignAssets).not.toHaveBeenCalled();
+  app.panel.dispose();
+});

@@ -1,0 +1,23 @@
+{
+  "name": "nemy-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local single-PC web pilot for USD Gaussian scene upload, conversion, and viewing",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sparkjsdev/spark": "2.3.1",
+    "hash-wasm": "4.12.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

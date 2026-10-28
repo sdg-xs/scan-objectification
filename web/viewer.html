@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nemy — BIM + Gaussian viewer</title>
+    <link rel="stylesheet" href="/src/viewer.css" />
+    <link rel="stylesheet" href="/src/viewer-theme.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">NEMY<span> / </span>VIEWER</a>
+      <span class="workspace"
+        >BIM + GAUSSIAN <span class="badge">LOCAL PREVIEW</span></span
+      >
+    </header>
+    <main class="workspace-grid">
+      <aside class="sidebar" aria-label="Scene controls">
+        <div class="intro">
+          <span class="eyebrow">01 / SCENE</span>
+          <h1>Model meets reality.</h1>
+          <p>Open a building model and a Gaussian scan in one view.</p>
+        </div>
+        <section class="layer">
+          <div class="section-heading">
+            <h2><span class="layer-dot bim-dot"></span>BIM model</h2>
+            <label class="toggle"
+              ><input id="ifc-visible" type="checkbox" checked />Show</label
+            >
+          </div>
+          <label class="file-button"
+            >Open IFC<input id="ifc-file" type="file" accept=".ifc"
+          /></label>
+          <p id="ifc-status" class="file-status" role="status">
+            No model loaded
+          </p>
+          <button id="ifc-fit" class="text-button" disabled>
+            Frame model ↗
+          </button>
+        </section>
+        <section class="layer">
+          <div class="section-heading">
+            <h2><span class="layer-dot scan-dot"></span>Gaussian scan</h2>
+            <label class="toggle"
+              ><input id="ply-visible" type="checkbox" checked />Show</label
+            >
+          </div>
+          <label class="file-button"
+            >Open Gaussian PLY<input id="ply-file" type="file" accept=".ply"
+          /></label>
+          <p id="ply-status" class="file-status" role="status">
+            No scan loaded
+          </p>
+          <button id="ply-fit" class="text-button" disabled>
+            Frame scan ↗
+          </button>
+        </section>
+        <section class="layer" aria-label="Asset selection" hidden>
+          <span class="eyebrow">02 / ASSET</span>
+          <h2>Isolate an asset</h2>
+          <fieldset id="asset-tools" disabled>
+            <label class="axis-select">Selection mode<select id="asset-operation">
+              <option value="replace">Replace selection</option>
+              <option value="add">Add to selection</option>
+              <option value="remove">Remove from selection</option>
+            </select></label>
+            <div class="button-row"><button id="asset-draw" aria-pressed="false">Draw box</button><button id="asset-section">Select section</button></div>
+            <div class="button-row"><button id="asset-isolate" disabled>Isolate asset</button><button id="asset-clear">Clear</button></div>
+          </fieldset>
+          <p id="asset-status" class="hint" role="status">Load a scan to select an asset.</p>
+          <p class="hint">Manual selection · boxes select through depth. Use the section box to limit depth.</p>
+        </section>
+        <section class="layer light-tools" aria-label="SAM object detection">
+          <span class="eyebrow">02 / SAM 3.1</span>
+          <h2>Detect &amp; select</h2>
+          <p class="hint">Use SAM to segment and select elements, then classify them into layers in the Model Browser.</p>
+          <button id="find-lights" class="apply" disabled>Open SAM workspace</button>
+          <p id="light-status" class="hint" role="status">Load a scan, then aim at the elements you need.</p>
+        </section>
+        <section class="alignment">
+          <span class="eyebrow">03 / ALIGNMENT</span>
+          <h2>Place the scan</h2>
+          <p class="hint">
+            Layers start centered independently. Adjust the scan to match the
+            BIM; survey coordinates are not aligned automatically.
+          </p>
+          <fieldset id="scan-controls" disabled>
+            <label class="axis-select"
+              >Scan up axis<select id="scan-axis">
+                <option value="z">Z up (survey)</option>
+                <option value="y">Y up</option>
+              </select></label
+            >
+            <form id="transform-form">
+              <span class="field-caption">Position · viewer units</span>
+              <div class="triple">
+                <label
+                  >X<input
+                    name="x"
+                    type="number"
+                    value="0"
+                    step="0.1"
+                    required /></label
+                ><label
+                  >Y<input
+                    name="y"
+                    type="number"
+                    value="0"
+                    step="0.1"
+                    required /></label
+                ><label
+                  >Z<input name="z" type="number" value="0" step="0.1" required
+                /></label>
+              </div>
+              <span class="field-caption">Rotation · degrees</span>
+              <div class="triple">
+                <label
+                  >X<input
+                    name="rx"
+                    type="number"
+                    value="0"
+                    step="1"
+                    required /></label
+                ><label
+                  >Y<input
+                    name="ry"
+                    type="number"
+                    value="0"
+                    step="1"
+                    required /></label
+                ><label
+                  >Z<input name="rz" type="number" value="0" step="1" required
+                /></label>
+              </div>
+              <label class="scale-label"
+                >Uniform scale<input
+                  name="scale"
+                  type="number"
+                  value="1"
+                  min="0.000001"
+                  step="any"
+                  required
+              /></label>
+              <div class="button-row">
+                <button type="submit" class="apply">Apply</button
+                ><button type="reset">Reset</button>
+              </div>
+            </form>
+          </fieldset>
+          <p id="alignment-status" class="hint" role="status">
+            Alignment changes last for this session.
+          </p>
+        </section>
+        <p class="privacy">Models stay in this browser. Detection sends one view to SAM 3.1 on this PC.</p>
+      </aside>
+      <section id="viewport" aria-label="3D model viewport">
+        <details id="segments-panel" class="segments-panel" open>
+          <summary><span>Model Browser</span><span id="segment-count" class="segment-count">0</span></summary>
+          <div class="segments-body">
+            <div class="segment-panel-tools">
+              <label hidden><input id="segment-context" type="checkbox" checked disabled /> Unsegmented scan context</label>
+              <button id="segment-add-group" type="button">Add Group</button>
+              <button id="segment-add-layer" type="button">Add Layer</button>
+              <button id="segment-delete" type="button" disabled>Delete selected group or layer</button>
+              <label class="segment-master-toggle"><input id="segment-scan-visible" type="checkbox" checked />Scan visibility</label>
+              <label class="segment-master-toggle"><input id="segment-assets-visible" type="checkbox" checked />Asset visibility</label>
+              <label class="segment-color-toggle"><input id="segment-colors" type="checkbox" disabled /> Original / classification colors</label>
+            </div>
+            <input id="segment-filter" type="search" aria-label="Filter Model Browser" placeholder="Filter objects, layers and groups" />
+            <div class="segment-asset-tools" aria-label="Asset appearance and selection">
+              <select id="segment-asset-colors" aria-label="Asset color mode"><option value="original">Original asset colors</option><option value="layer">Asset colors by layer</option><option value="custom">Custom asset colors</option></select>
+              <button id="segment-assets-all" type="button">All assets</button>
+              <span id="segment-asset-selection-count">0 assets selected</span>
+              <input id="segment-assets-color" type="color" value="#69b8ee" aria-label="Color selected assets" disabled />
+              <button id="segment-assets-show" type="button" disabled>Show selected assets</button>
+              <button id="segment-assets-hide" type="button" disabled>Hide selected assets</button>
+            </div>
+            <button id="segment-clear-highlight" type="button" hidden>Clear selection</button>
+            <dialog id="segment-create-dialog" class="segment-dialog" aria-labelledby="segment-create-title">
+              <h3 id="segment-create-title">Add group or layer</h3>
+              <p id="segment-create-error" role="alert" hidden></p>
+              <form id="segment-group-form">
+                <fieldset id="segment-group-tools">
+                  <input id="segment-group-name" type="text" maxlength="80" required aria-label="New group name" placeholder="Group, e.g. Level 1" />
+                  <div id="segment-group-selection" class="segment-create-selection" hidden>
+                    <label class="segment-create-check"><input id="segment-group-classify" type="checkbox" /><span id="segment-group-selection-text">Classify selected elements</span></label>
+                    <label id="segment-group-layer-field">First layer name<input id="segment-group-layer-name" type="text" maxlength="80" value="Layer 1" aria-label="First layer in new group" /></label>
+                  </div>
+                  <button id="segment-new-group" type="submit">+ Group</button>
+                </fieldset>
+              </form>
+              <form id="segment-layer-form">
+                <fieldset id="segment-layer-tools">
+                  <input id="segment-layer-name" type="text" maxlength="80" required aria-label="New layer name" placeholder="Layer, e.g. Ceiling" />
+                  <select id="segment-new-layer-group" aria-label="Group for new layer"><option value="">No group</option></select>
+                  <label id="segment-layer-selection" class="segment-create-selection segment-create-check" hidden><input id="segment-layer-classify" type="checkbox" /><span id="segment-layer-selection-text">Classify selected elements</span></label>
+                  <button id="segment-new-layer" type="submit">+ Layer</button>
+                </fieldset>
+              </form>
+              <button id="segment-create-cancel" type="button">Cancel</button>
+            </dialog>
+            <dialog id="segment-delete-dialog" class="segment-dialog" aria-labelledby="segment-delete-title">
+              <form id="segment-delete-form">
+                <h3 id="segment-delete-title">Delete group or layer</h3>
+                <p id="segment-delete-description"></p>
+                <div id="segment-delete-assignment">
+                  <label for="segment-delete-destination">Preserve contained elements by</label>
+                  <select id="segment-delete-destination"><option value="">Unassigning to Unclassified</option></select>
+                </div>
+                <div class="segment-delete-actions">
+                  <button id="segment-delete-confirm" type="submit">Delete</button>
+                  <button id="segment-delete-cancel" type="button">Cancel</button>
+                </div>
+              </form>
+            </dialog>
+            <dialog id="segment-name-dialog" class="segment-dialog" aria-labelledby="segment-name-title">
+              <form id="segment-name-form">
+                <h3 id="segment-name-title">Name and classify meshes</h3>
+                <p id="segment-name-destination"></p>
+                <div id="segment-classify-names"></div>
+                <p id="segment-name-error" role="alert" hidden></p>
+                <div class="segment-delete-actions">
+                  <button type="submit">Classify</button>
+                  <button id="segment-name-cancel" type="button">Cancel</button>
+                </div>
+              </form>
+            </dialog>
+            <p id="segment-status" class="hint" role="status" hidden></p>
+            <div id="segment-list" role="group" aria-label="Layers, groups and elements"></div>
+            <p class="segment-session-note" hidden>Temporary · stays with this loaded scan.</p>
+          </div>
+        </details>
+        <dialog id="asset-assignment-dialog" class="segment-dialog asset-assignment-dialog" aria-labelledby="asset-assignment-title">
+          <h3 id="asset-assignment-title">Asset Library</h3>
+          <p id="asset-assignment-scope"></p>
+          <div id="asset-library-picker"></div>
+          <p id="asset-assignment-status" role="status"></p>
+          <div class="segment-delete-actions">
+            <button id="asset-assignment-apply" type="button" disabled>Assign asset</button>
+            <button id="asset-library-retry" type="button">Reload library</button>
+            <button id="asset-assignment-close" type="button">Close</button>
+          </div>
+        </dialog>
+        <dialog id="asset-preview-dialog" class="segment-dialog asset-preview-dialog" aria-labelledby="asset-preview-title">
+          <h3 id="asset-preview-title">Asset preview</h3>
+          <div id="asset-preview-viewport"></div>
+          <p id="asset-preview-status" role="status"></p>
+          <div class="segment-delete-actions">
+            <button id="asset-preview-assign" type="button">Assign asset</button>
+            <button id="asset-preview-close" type="button">Close preview</button>
+          </div>
+        </dialog>
+        <section id="target-layer-window" class="target-layer-window segment-classification-footer" aria-label="Target layer and classification">
+          <div id="segment-target-picker" class="target-layer-picker">
+            <span class="segment-target-caption">Target Layer</span>
+            <button id="segment-target" type="button" aria-label="Choose target layer" aria-haspopup="listbox" aria-expanded="false" aria-controls="segment-target-options" disabled><span id="segment-target-label">Choose target layer…</span></button>
+            <div id="segment-target-options" class="target-layer-options" popover="manual" role="listbox" aria-label="Target layers" hidden></div>
+          </div>
+          <div class="segment-operations">
+            <button id="segment-classify" type="button" disabled>Classify</button>
+            <button id="segment-move" type="button" disabled>Move</button>
+            <button id="segment-unclassify" type="button" disabled>Unclassify</button>
+          </div>
+        </section>
+        <dialog id="light-results" class="light-dialog" aria-labelledby="light-result-title">
+          <header>
+            <div><span class="eyebrow">SAM 3.1 / LOCAL</span><h2 id="light-result-title">Detect &amp; select</h2></div>
+            <button id="close-light-results" aria-label="Close SAM workspace">Close</button>
+          </header>
+          <form id="sam-form" class="sam-prompt-form">
+            <label for="sam-prompt">Context · what should SAM find?</label>
+            <div class="sam-prompt-row">
+              <input id="sam-prompt" type="text" maxlength="240" required placeholder="e.g. linear ceiling light, round bulb" value="linear light fixture" aria-describedby="sam-capture-hint" />
+              <button id="sam-run" type="submit" class="apply">Capture &amp; detect current view</button>
+            </div>
+            <p id="sam-capture-hint" class="hint">Type a visual description, then adjust your view. Capture uses the camera at the moment you click. The viewer pauses while SAM processes it.</p>
+          </form>
+          <p id="light-result-status" role="status"></p>
+          <p id="sam-timing" class="hint" role="status"></p>
+          <ul id="light-counts" class="light-counts" aria-label="Detection counts"></ul>
+          <div id="sam-matches" class="sam-matches" aria-label="Detected elements"></div>
+          <button id="sam-select" disabled>Add &amp; select checked matches</button>
+          <div class="light-image-frame"><img id="light-result-image" alt="Captured view for object detection" /></div>
+          <p class="hint">Checked matches become selected elements in Unclassified. Choose a layer in the separate Target Layer window, then Classify. Default names follow Layer Name 01, 02, … and can be edited before confirmation. Projection goes through depth; use the section box to exclude splats behind the target. Source files stay unchanged.</p>
+        </dialog>
+        <div class="view-actions" aria-label="Viewport controls">
+        <div
+          id="section-tools"
+          class="section-tools"
+          aria-label="Section box controls"
+        >
+          <label
+            ><input id="section-enabled" type="checkbox" disabled /> Section
+            box</label
+          >
+          <div class="section-actions">
+            <button id="section-resize" aria-pressed="true" disabled>
+              Resize</button
+            ><button id="section-move" aria-pressed="false" disabled>
+              Move</button
+            ><button id="section-rotate" aria-pressed="false" disabled>Rotate</button
+            ><button id="section-reset" disabled>Reset box</button>
+          </div>
+          <p id="section-hint">Clip both layers with one box.</p>
+        </div>
+        <button id="fit-all" disabled>Fit all <kbd>F</kbd></button>
+        </div>
+        <div class="view-toolbar">
+          <span class="view-label">PERSPECTIVE <span>/ Z UP</span></span>
+        </div>
+        <div id="empty-state">
+          <span class="crosshair">+</span>
+          <h2>Your scene starts here.</h2>
+          <p>
+            Open an IFC model or Gaussian PLY to begin.<br />Load both to
+            compare design with the captured site.
+          </p>
+        </div>
+        <p id="viewer-error" role="alert" hidden></p>
+        <div class="view-footer">
+          <span
+            ><i></i> <span id="scene-status">Ready for local files</span></span
+          ><span>Drag to orbit · Right-drag to pan · Scroll to zoom</span>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/viewer.ts"></script>
+  </body>
+</html>

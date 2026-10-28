@@ -1,0 +1,11 @@
+# Warm SAM worker and paused viewer
+
+User approved model reuse, pausing viewer rendering during SAM work and stage timings. They also specified that processing will move to the cloud later. Keep all browser traffic on the existing app API; model caching and eviction belong to the worker. Status and timing schemas are independent of where inference runs. Do not add cloud credentials, deployments, dependencies or endpoint configuration in this change.
+
+Cache one predictor in the existing serialized worker. Recreate only the image-specific inference state per request, clear it afterward, and unload the predictor after 120 seconds without a request. Cancel idle eviction while work runs; use generation checks to prevent stale timers evicting a newly used predictor. Release on errors and graceful shutdown. Exit the upstream constructor's thread-local autocast context immediately, then enter a fresh bfloat16/inference context for each request, allowing reuse across threadpool threads. Keep compilation/FlashAttention settings unchanged.
+
+Pause the Three.js animation loop while the SAM modal is open. Explicit same-call capture still renders the requested frame. Resume on closing, errors followed by closing, or cancellation; page disposal must not restart the viewer. Closing aborts the browser wait, but a GPU operation already underway may still finish.
+
+Expose bounded same-origin worker status with busy/model-loaded/phase fields and no automatic start from polling. Return validated load/frame-setup/detection/other/total timings with the result. Poll only during detection and stop on completion, cancellation and disposal. Show the measured stage durations and model reuse in the modal; report splat-projection time after application. These are operational timings, not progress percentages or an ETA.
+
+Verify cache reuse, frame cleanup, idle eviction, stale-timer protection, failure recovery, busy status, gateway origin boundaries and timing validation. Run the normal full gate and separate worker tests. Exercise consecutive real requests on a generated image to verify warm reuse; report that this diagnostic does not measure real-scene accuracy or production speedup. Browser-origin inspection remains denied; do not bypass it.

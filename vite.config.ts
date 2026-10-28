@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
 
 /**
  * The frontend lives in `web/` and is built to the repository-root `dist/`
@@ -8,9 +9,25 @@ import { defineConfig } from "vite";
  */
 export default defineConfig({
   root: "web",
+  // The asset IFC worker starts on demand. Discovering this dependency later
+  // changes Fragments' shared prebundle and reloads the session-only viewer.
+  optimizeDeps: { include: ["web-ifc", "react", "react-dom/client", "react/jsx-runtime"] },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./web/index.html", import.meta.url)),
+        viewer: fileURLToPath(new URL("./web/viewer.html", import.meta.url)),
+      },
+      output: {
+        // web-ifc locates this binary by its fixed filename beside the WASM path.
+        assetFileNames: (asset) =>
+          asset.names.includes("web-ifc.wasm")
+            ? "assets/[name][extname]"
+            : "assets/[name]-[hash][extname]",
+      },
+    },
   },
   server: {
     proxy: {

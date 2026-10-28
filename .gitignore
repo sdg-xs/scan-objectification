@@ -30,3 +30,8 @@ build/
 /.claude-flow/
 /.swarm/
 /delivery/
+
+# Local acceptance models and browser verification artifacts.
+/test_files/
+/output/playwright/
+/.playwright-cli/
