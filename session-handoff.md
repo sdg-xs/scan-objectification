@@ -1,3 +1,10 @@
+## Model Browser asset rows and visibility — 2026-10-28
+
+User approved Scan and Assets visibility masters immediately before the existing layer-color toggle. Model Browser widened to 410px with viewport limits. Assigned assets render as indented children with independent eye/color and clickable settings name; element eyes affect scan only, shared group/layer/root gates affect both. Asset Ctrl/Shift selection, All assets, bulk Show/Hide/custom color, Original/By layer/Custom modes, linked source/asset highlighting, settings color/removal, and assignment-only Delete are implemented. Source splats remain unchanged; records remain session-only. Geometry is shared while each placed instance owns private materials for color/highlight and disposes those on removal.
+
+TDD reproduced missing independent visibility, child rows, private colors, bulk controls and selection-preserving isolation. Independent review found an isolation regression: visibility synchronization called selection.clear during setup/restore. Isolation now uses an explicit preserveSelection visibility update; normal master controls retain selection clearing. Native row color picker commits on change so its DOM is not replaced while dragging. Review otherwise found no important material lifecycle/visibility findings.
+
+Verification: 106 frontend and 76 backend tests pass, typecheck/build pass, actual isolated-Vite IFC first-load test passes with zero reloads. Existing optional Fragments WebGPU export and bundle-size build warnings remain. Browser visual verification of the prepared user scene remains pending an available connection; no bypass used. External asset library and unrelated build-check.log preserved.
 ## Guard IFC input axes for Z-only asset placement — 2026-10-28
 
 User reported an assigned light also appears rotated around Y and requested Playwright inspection. Both browser connection inventory and Playwright CLI showed no connected browser; retry against the supplied localhost:5173 URL exposed only an empty MCP Apps browser. No screenshot or visual inspection of the prepared scene occurred. Do not claim the exact current instance state was observed.

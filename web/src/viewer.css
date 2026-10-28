@@ -541,7 +541,7 @@ kbd {
 .sam-matches { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; max-height: 130px; overflow: auto; }
 .sam-matches label { display: flex; align-items: center; gap: 6px; }
 #sam-select { margin-bottom: 12px; }
-.segments-panel { position: absolute; top: 70px; left: 24px; width: min(350px, calc(100% - 48px)); overflow: hidden; z-index: 4; border: 1px solid #52634c; border-radius: 6px; background: #17221ff5; color: #e4e9e8; box-shadow: 0 8px 24px #0004; font-size: 12px; }
+.segments-panel { position: absolute; top: 70px; left: 24px; width: min(410px, calc(100% - 48px)); overflow: hidden; z-index: 4; border: 1px solid #52634c; border-radius: 6px; background: #17221ff5; color: #e4e9e8; box-shadow: 0 8px 24px #0004; font-size: 12px; }
 .segments-panel[open] { bottom: 58px; display: flex; flex-direction: column; }
 .segments-panel[open]::details-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .segments-panel[open] > summary { flex-shrink: 0; }
@@ -650,3 +650,12 @@ kbd {
 .asset-placement-options label { display: grid; gap: 6px; flex: 1; }
 .asset-pose-list { max-height: 160px; overflow: auto; font-size: 11px; }
 .asset-pose-list p { margin: 6px 0; }
+
+.segments-panel .segment-master-toggle { width: auto; gap: 4px; font-size: 10px; }
+.segment-asset-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; flex-shrink: 0; }
+.segments-panel .segment-asset-tools select { flex: 1; width: auto; font-size: 11px; }
+#segment-asset-selection-count { flex: 1; flex-basis: 50%; font-size: 10px; }
+.segment-asset-row { display: flex; gap: 6px; align-items: center; margin: 0 0 3px 42px; padding: 3px 0 3px 8px; border-left: 1px solid var(--line); cursor: pointer; }
+.segment-asset-row > svg { flex-shrink: 0; width: 15px; height: 15px; }
+.segments-panel .segment-asset-name { flex: 1; min-width: 0; padding: 4px; text-align: left; background: transparent; border-color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.segment-asset-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

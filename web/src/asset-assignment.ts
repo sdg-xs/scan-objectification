@@ -2,7 +2,7 @@ import { normalizedAsset } from "./asset-geometry";
 import { libraryJson, loadAssetGeometry, parseCatalog } from "./asset-library-client";
 import type { CatalogAsset } from "./asset-library-client";
 import type { Segment } from "./segments-model";
-import type { PlacedAssets } from "./placed-assets";
+import type { AssetPresentation, PlacedAssets } from "./placed-assets";
 
 function control<T extends HTMLElement>(id: string): T { return document.querySelector<T>(`#${id}`)!; }
 export class AssetAssignmentControls {
@@ -19,7 +19,8 @@ export class AssetAssignmentControls {
   private current: readonly Segment[] = [];
   private visible: (segment: Segment) => boolean = () => true;
   private busy = false;
-  constructor(private readonly placed: PlacedAssets, private readonly changed: () => void) {
+  private presentation: AssetPresentation | undefined;
+  constructor(private readonly placed: PlacedAssets, private readonly changed: (mode?: AssetPresentation["colorMode"]) => void) {
     const signal = this.events.signal;
     control("asset-assignment-close").addEventListener("click", () => this.close(), { signal });
     this.dialog.addEventListener("cancel", event => { event.preventDefault(); this.close(); }, { signal });
@@ -29,6 +30,17 @@ export class AssetAssignmentControls {
     control("asset-library-category").addEventListener("change", () => this.filter(), { signal });
     this.choice.addEventListener("change", () => this.buttons(), { signal });
     this.apply.addEventListener("click", () => { void this.assign(); }, { signal });
+    control("asset-apply-color").addEventListener("click", () => {
+      try {
+        this.validateScope(); const color = control<HTMLInputElement>("asset-settings-color").value;
+        for (const { segment } of this.scope) if (segment.asset) segment.asset.color = color;
+        this.changed("custom"); this.status.textContent = "Custom color applied to existing assets.";
+      } catch (error) { this.error(error); }
+    }, { signal });
+    control("asset-remove-assignment").addEventListener("click", () => {
+      try { this.validateScope(); for (const { segment } of this.scope) delete segment.asset; this.close(); this.changed(); }
+      catch (error) { this.error(error); }
+    }, { signal });
     this.correct.addEventListener("click", () => {
       try {
         this.validateScope();
@@ -39,10 +51,11 @@ export class AssetAssignmentControls {
       } catch (error) { this.error(error); }
     }, { signal });
   }
-  sync(segments: readonly Segment[], visible: (segment: Segment) => boolean): void {
+  sync(segments: readonly Segment[], visible: (segment: Segment) => boolean, presentation?: AssetPresentation): void {
+    this.presentation = presentation;
     this.current = segments; this.visible = visible;
     if (this.dialog.open && !this.validScope()) this.close();
-    this.placed.sync(segments, visible);
+    this.placed.sync(segments, visible, presentation);
   }
   async open(segments: readonly Segment[]): Promise<void> {
     this.close();
@@ -56,6 +69,7 @@ export class AssetAssignmentControls {
       poses.append(line);
     }
     const first = segments[0]?.asset;
+    control<HTMLInputElement>("asset-settings-color").value = first?.color ?? "#69b8ee";
     this.correction.value = String(first && segments.every(row => row.asset?.correctionZ === first.correctionZ) ? first.correctionZ * 180 / Math.PI : 0);
     control<HTMLSelectElement>("asset-source-up").value = first?.sourceUp ?? "y";
     control<HTMLSelectElement>("asset-unit-scale").value = String(first?.scale ?? 1);
@@ -106,6 +120,7 @@ export class AssetAssignmentControls {
     if (ifc) sourceUp.value = "y";
     sourceUp.disabled = this.busy || ifc;
     this.apply.disabled = this.busy || !this.choice.value || !this.scope.length || this.scope.some(({ segment }) => !segment.pose);
+    control<HTMLButtonElement>("asset-apply-color").disabled = control<HTMLButtonElement>("asset-remove-assignment").disabled = this.busy || !this.scope.some(({ segment }) => segment.asset);
     this.correct.disabled = this.busy || !this.scope.some(({ segment }) => segment.asset);
     control<HTMLButtonElement>("asset-library-retry").disabled = this.busy;
   }
@@ -128,8 +143,8 @@ export class AssetAssignmentControls {
         this.placed.cache(asset.id, normalizedAsset(loaded.geometry, sourceUp), sourceUp);
       }
       request.signal.throwIfAborted(); this.validateScope();
-      for (const { segment } of this.scope) segment.asset = { id: asset.id, name: asset.name, correctionZ, scale, sourceUp };
-      this.changed(); this.placed.sync(this.current, this.visible);
+      for (const { segment } of this.scope) segment.asset = { visible: segment.asset?.visible, color: segment.asset?.color, id: asset.id, name: asset.name, correctionZ, scale, sourceUp };
+      this.changed(); this.placed.sync(this.current, this.visible, this.presentation);
       this.status.textContent = `Assigned ${asset.name} to ${this.scope.length} elements. Close to inspect the viewer; reopen to correct Z rotation.`;
     } catch (error) { if (!request.signal.aborted) this.error(error); }
     finally { if (this.request === request) { this.busy = false; this.buttons(); } }

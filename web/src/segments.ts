@@ -6,6 +6,7 @@ import { SegmentCollection } from "./segments-model";
 import type { Segment, SegmentGroup, SegmentLayer } from "./segments-model";
 import { classificationButton, classificationIcon, classificationToggle } from "./classification-icons";
 import type { ClassificationIcon } from "./classification-icons";
+import type { AssetPresentation } from "./placed-assets";
 import { TargetLayerPicker } from "./target-layer-picker";
 
 export class SegmentPanel {
@@ -14,15 +15,20 @@ export class SegmentPanel {
   private readonly status = document.querySelector<HTMLParagraphElement>("#segment-status")!;
   private readonly target = new TargetLayerPicker(id => this.setActiveLayer(id));
   private readonly colors = document.querySelector<HTMLInputElement>("#segment-colors")!;
+  private readonly scanVisible = document.querySelector<HTMLInputElement>("#segment-scan-visible")!;
+  private readonly assetsVisible = document.querySelector<HTMLInputElement>("#segment-assets-visible")!;
+  private readonly assetColorMode = document.querySelector<HTMLSelectElement>("#segment-asset-colors")!;
   private readonly context = document.querySelector<HTMLInputElement>("#segment-context")!;
   private readonly createDialog = document.querySelector<HTMLDialogElement>("#segment-create-dialog")!;
   private readonly deleteDialog = document.querySelector<HTMLDialogElement>("#segment-delete-dialog")!;
   private readonly nameDialog = document.querySelector<HTMLDialogElement>("#segment-name-dialog")!;
   private pendingClassification: { ids: number[]; layerId: number } | undefined;
   private container: { kind: "group" | "layer"; id: number } | undefined;
-  private deleting: { kind: "group" | "layer"; id: number } | { kind: "elements"; ids: number[] } | undefined;
+  private deleting: { kind: "group" | "layer"; id: number } | { kind: "elements"; ids: number[] } | { kind: "assets"; ids: number[] } | undefined;
   private readonly events = new AbortController();
   private readonly selected = new Set<number>();
+  private readonly selectedAssets = new Set<number>();
+  private assetAnchor: number | undefined;
   private selectionAnchor: number | undefined;
   private readonly expanded = new Map<string, boolean>();
   private filter = "";
@@ -30,7 +36,7 @@ export class SegmentPanel {
   private rgba: RgbaArray | undefined;
   private modifier: GsplatModifier | undefined;
 
-  constructor(private readonly actions: { select: (indices: Uint32Array) => void; clear: () => void; error: (error: unknown) => void; assignAssets?: (elements: readonly Segment[]) => void; syncAssets?: (elements: readonly Segment[], visible: (segment: Segment) => boolean) => void; resetAssets?: () => void }) {
+  constructor(private readonly actions: { select: (indices: Uint32Array) => void; clear: () => void; error: (error: unknown) => void; assignAssets?: (elements: readonly Segment[]) => void; syncAssets?: (elements: readonly Segment[], visible: (segment: Segment) => boolean, presentation?: AssetPresentation) => void; resetAssets?: () => void; scanVisibilityChanged?: (visible: boolean) => void }) {
     const signal = this.events.signal;
     for (const [id, icon, label] of [
       ["segment-classify", "classify", "Classify selected objects into the Target Layer"],
@@ -46,7 +52,25 @@ export class SegmentPanel {
       label.textContent = text;
       document.querySelector(`#${id}`)!.append(label);
     }
-    classificationToggle(this.colors, "colors", "Display classification colors (off: original colors)");
+    classificationToggle(this.colors, "colors", "Display scan classification colors (off: original colors)");
+    for (const [input, icon, name] of [[this.scanVisible, "unclassified", "Scan"], [this.assetsVisible, "classifiedMesh", "Assets"]] as const) {
+      classificationToggle(input, icon, `Show ${name.toLowerCase()} (master visibility)`);
+      const caption = document.createElement("span"); caption.textContent = name; input.closest("label")!.append(caption);
+    }
+    this.assetColorMode.value = "original";
+    this.scanVisible.addEventListener("change", () => this.setScanVisibility(this.scanVisible.checked), { signal });
+    this.assetsVisible.addEventListener("change", () => { this.model.assetsVisible = this.assetsVisible.checked; this.assetsChanged(); }, { signal });
+    this.assetColorMode.addEventListener("change", () => this.assetsChanged(), { signal });
+    classificationButton(document.querySelector<HTMLButtonElement>("#segment-assets-show")!, "eye", "Show selected assets");
+    classificationButton(document.querySelector<HTMLButtonElement>("#segment-assets-hide")!, "eyeOff", "Hide selected assets");
+    document.querySelector("#segment-assets-all")!.addEventListener("click", () => this.selectAllAssets(), { signal });
+    for (const [id, visible] of [["segment-assets-show", true], ["segment-assets-hide", false]] as const)
+      document.querySelector(`#${id}`)!.addEventListener("click", () => { for (const row of this.model.segments) if (row.asset && this.selectedAssets.has(row.id)) row.asset.visible = visible; this.assetsChanged(); }, { signal });
+    document.querySelector<HTMLInputElement>("#segment-assets-color")!.addEventListener("input", event => {
+      if (!(event.target instanceof HTMLInputElement)) return;
+      for (const row of this.model.segments) if (row.asset && this.selectedAssets.has(row.id)) row.asset.color = event.target.value;
+      this.assetsChanged("custom");
+    }, { signal });
     this.context.addEventListener("change", () => { this.model.contextVisible = this.context.checked; this.changed(); }, { signal });
     this.colors.addEventListener("change", () => {
       this.colors.closest("label")!.title = this.colors.checked ? "Classification colors · switch to original colors" : "Original colors · switch to classification colors";
@@ -74,7 +98,9 @@ export class SegmentPanel {
       if (!this.deleting) return;
       const destination = document.querySelector<HTMLSelectElement>("#segment-delete-destination")!.value;
       try {
-        if (this.deleting.kind === "elements") {
+        if (this.deleting.kind === "assets") {
+          for (const row of this.model.segments) if (this.deleting.ids.includes(row.id)) delete row.asset;
+        } else if (this.deleting.kind === "elements") {
           for (const id of this.deleting.ids) this.model.remove(id);
         } else this.model.deleteContainer(this.deleting.kind, this.deleting.id, destination ? Number(destination) : null);
         this.deleting = undefined;
@@ -176,11 +202,14 @@ export class SegmentPanel {
     this.release();
     this.mesh = mesh;
     this.model.reset(mesh?.numSplats ?? 0, preserveHierarchy);
-    this.selected.clear();
+    this.selected.clear(); this.selectedAssets.clear(); this.assetAnchor = undefined;
     this.selectionAnchor = undefined;
     this.expanded.clear();
     this.filter = "";
     document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
+    this.scanVisible.checked = this.assetsVisible.checked = true;
+    this.actions.scanVisibilityChanged?.(true);
+    this.assetColorMode.value = "original";
     this.colors.checked = false;
     this.context.checked = true;
     this.context.disabled = !mesh;
@@ -204,7 +233,7 @@ export class SegmentPanel {
       this.expanded.set("unclassified", true);
       document.querySelector<HTMLDetailsElement>("#segments-panel")!.open = true;
     }
-    this.selected.clear();
+    this.selected.clear(); this.selectedAssets.clear(); this.assetAnchor = undefined;
     for (const segment of this.model.segments)
       if (!previous.has(segment.id) && this.model.isVisible(segment)) this.selected.add(segment.id);
     this.selectionAnchor = [...this.selected][0];
@@ -226,42 +255,73 @@ export class SegmentPanel {
     this.assetsChanged();
   }
 
-  assetsChanged(): void { this.paint(); this.render(); }
+  get isScanVisible(): boolean { return this.model.scanVisible; }
+  setScanVisibility(visible: boolean, options: { preserveSelection?: boolean } = {}): void {
+    this.model.scanVisible = this.scanVisible.checked = visible;
+    this.actions.scanVisibilityChanged?.(visible);
+    if (options.preserveSelection) { this.paint(); this.render(); }
+    else this.changed();
+  }
 
-  clearSelection(): void { this.selected.clear(); this.selectionAnchor = undefined; this.actions.clear(); this.render(); }
+  assetsChanged(mode?: AssetPresentation["colorMode"]): void { if (mode) this.assetColorMode.value = mode; this.render(); }
+
+  clearSelection(): void { this.selected.clear(); this.selectedAssets.clear(); this.assetAnchor = undefined; this.selectionAnchor = undefined; this.actions.clear(); this.render(); }
 
   visibility(): Uint8Array | undefined {
-    return this.model.contextVisible && this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
+    return this.model.scanVisible && this.model.contextVisible && this.model.unclassifiedVisible && this.model.segments.every(segment => this.model.isVisible(segment))
       ? undefined : this.model.visibility();
   }
 
-  private changed(): void { this.selected.clear(); this.selectionAnchor = undefined; this.actions.clear(); this.paint(); this.render(); }
+  private changed(): void { this.selected.clear(); this.selectedAssets.clear(); this.assetAnchor = undefined; this.selectionAnchor = undefined; this.actions.clear(); this.paint(); this.render(); }
 
-  private chooseObject(id: number, event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): void {
+  private chooseRow(id: number, kind: "scan" | "asset", event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): void {
     const segment = this.model.segments.find(item => item.id === id);
-    if (!segment || !this.model.isVisible(segment)) return;
-    const ordered = this.visibleObjectIds();
-    const first = this.selectionAnchor === undefined ? -1 : ordered.indexOf(this.selectionAnchor);
-    const last = ordered.indexOf(id);
+    if (!segment || (kind === "scan" ? !this.model.isVisible(segment) : !segment.asset)) return;
+    const selected = kind === "scan" ? this.selected : this.selectedAssets;
+    if (kind === "scan") { this.selectedAssets.clear(); this.assetAnchor = undefined; } else { this.selected.clear(); this.selectionAnchor = undefined; }
+    const ordered = this.visibleRowIds(kind);
+    const anchor = kind === "scan" ? this.selectionAnchor : this.assetAnchor;
+    const first = anchor === undefined ? -1 : ordered.indexOf(anchor), last = ordered.indexOf(id);
     if (event.shiftKey && first >= 0 && last >= 0) {
-      if (!event.ctrlKey && !event.metaKey) this.selected.clear();
-      for (const item of ordered.slice(Math.min(first, last), Math.max(first, last) + 1)) this.selected.add(item);
+      if (!event.ctrlKey && !event.metaKey) selected.clear();
+      for (const item of ordered.slice(Math.min(first, last), Math.max(first, last) + 1)) selected.add(item);
     } else {
-      if (event.ctrlKey || event.metaKey) {
-        if (this.selected.has(id)) this.selected.delete(id); else this.selected.add(id);
-      } else { this.selected.clear(); this.selected.add(id); }
-      this.selectionAnchor = id;
+      if (event.ctrlKey || event.metaKey) { if (selected.has(id)) selected.delete(id); else selected.add(id); }
+      else { selected.clear(); selected.add(id); }
+      if (kind === "scan") this.selectionAnchor = id; else this.assetAnchor = id;
     }
-    this.container = undefined;
-    this.highlight();
-    this.markSelection();
+    this.container = undefined; this.highlight(); this.markSelection();
   }
 
-  private visibleObjectIds(): number[] {
-    const selectable = new Set(this.model.segments.filter(segment => this.model.isVisible(segment)).map(segment => segment.id));
-    return [...this.list.querySelectorAll<HTMLElement>("[data-object-id]")]
-      .filter(row => !row.closest("details:not([open])"))
-      .map(row => Number(row.dataset.objectId)).filter(id => selectable.has(id));
+  private visibleRowIds(kind: "scan" | "asset"): number[] {
+    const selectable = new Set(this.model.segments.filter(segment => kind === "scan" ? this.model.isVisible(segment) : Boolean(segment.asset)).map(segment => segment.id));
+    const key = kind === "scan" ? "objectId" : "assetId";
+    return [...this.list.querySelectorAll<HTMLElement>(kind === "scan" ? "[data-object-id]" : "[data-asset-id]")]
+      .filter(row => !row.closest("details:not([open])")).map(row => Number(row.dataset[key])).filter(id => selectable.has(id));
+  }
+
+  private selectAllAssets(): void {
+    this.selected.clear(); this.selectionAnchor = undefined; this.selectedAssets.clear(); this.container = undefined;
+    for (const row of this.model.segments) if (row.asset) this.selectedAssets.add(row.id);
+    this.filter = ""; document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
+    for (const key of ["root", "unclassified", ...this.model.groups.map(g => `group-${g.id}`), ...this.model.layers.map(l => `layer-${l.id}`)]) this.expanded.set(key, true);
+    this.assetAnchor = [...this.selectedAssets][0]; this.highlight(); this.render();
+  }
+
+  private bindRowSelection(row: HTMLElement, id: number, kind: "scan" | "asset"): void {
+    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey || event.shiftKey) event.preventDefault(); this.chooseRow(id, kind, event); });
+    row.addEventListener("keydown", event => {
+      if (event.target !== row) return;
+      if (kind === "asset" && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); this.selectAllAssets(); return; }
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); this.chooseRow(id, kind, event); }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault(); const ids = this.visibleRowIds(kind), next = ids[ids.indexOf(id) + (event.key === "ArrowDown" ? 1 : -1)];
+        if (next !== undefined) {
+          if (!event.ctrlKey && !event.metaKey) this.chooseRow(next, kind, event);
+          this.list.querySelector<HTMLElement>(`[data-${kind === "scan" ? "object" : "asset"}-id="${next}"]`)?.focus();
+        }
+      }
+    });
   }
 
   private markSelection(): void {
@@ -271,6 +331,18 @@ export class SegmentPanel {
       row.setAttribute("data-selected", String(selected));
       row.setAttribute("aria-description", `${selected ? "Selected" : "Not selected"}. Ctrl+click toggles selection; Shift+click selects a range.`);
     }
+    for (const row of this.list.querySelectorAll<HTMLElement>("[data-object-id]")) row.setAttribute("data-linked", String(this.selectedAssets.has(Number(row.dataset.objectId))));
+    for (const row of this.list.querySelectorAll<HTMLElement>("[data-asset-id]")) {
+      const id = Number(row.dataset.assetId), selected = this.selectedAssets.has(id);
+      row.setAttribute("data-selected", String(selected)); row.setAttribute("data-linked", String(this.selected.has(id)));
+      row.setAttribute("aria-description", `${selected ? "Selected" : "Not selected"}. Ctrl+click toggles; Shift+click selects an asset range.`);
+    }
+    document.querySelector("#segment-asset-selection-count")!.textContent = `${this.selectedAssets.size} assets selected`;
+    for (const id of ["segment-assets-show", "segment-assets-hide", "segment-assets-color"]) document.querySelector<HTMLInputElement>(`#${id}`)!.disabled = !this.selectedAssets.size;
+    const hasAssets = this.model.segments.some(row => row.asset);
+    document.querySelector<HTMLButtonElement>("#segment-assets-all")!.disabled = !hasAssets;
+    this.assetColorMode.disabled = this.assetsVisible.disabled = !hasAssets; this.scanVisible.disabled = !this.mesh;
+    this.syncAssets();
     document.querySelector<HTMLButtonElement>("#segment-classify")!.disabled = !this.selected.size || this.model.targetLayerId === null;
     document.querySelector<HTMLButtonElement>("#segment-move")!.disabled = this.model.targetLayerId === null ||
       !this.model.segments.some(segment => this.selected.has(segment.id) && segment.layerId !== this.model.targetLayerId);
@@ -366,9 +438,9 @@ export class SegmentPanel {
     for (const heading of this.list.querySelectorAll<HTMLElement>("[data-container]"))
       heading.classList.toggle("segment-container-selected", heading.dataset.container === key);
     const button = document.querySelector<HTMLButtonElement>("#segment-delete")!;
-    button.disabled = !this.container && !this.selected.size;
+    button.disabled = !this.container && !this.selected.size && !this.selectedAssets.size;
     const item = this.container && (this.container.kind === "group" ? this.model.groups : this.model.layers).find(item => item.id === this.container?.id);
-    button.title = item ? `Delete ${this.container!.kind} ${item.name}` : this.selected.size ? `Remove ${this.selected.size} selected elements from the list; preserve geometry` : "Select elements, a group or a layer to delete";
+    button.title = item ? `Delete ${this.container!.kind} ${item.name}` : this.selectedAssets.size ? `Remove ${this.selectedAssets.size} selected asset assignments; preserve scan` : this.selected.size ? `Remove ${this.selected.size} selected elements from the list; preserve geometry` : "Select elements, a group or a layer to delete";
     button.setAttribute("aria-label", button.title);
   }
 
@@ -377,6 +449,12 @@ export class SegmentPanel {
     const assignment = document.querySelector<HTMLElement>("#segment-delete-assignment")!;
     assignment.hidden = !container;
     if (!container) {
+      if (this.selectedAssets.size) {
+        this.deleting = { kind: "assets", ids: [...this.selectedAssets] };
+        document.querySelector("#segment-delete-title")!.textContent = `Remove ${this.selectedAssets.size} asset assignments?`;
+        document.querySelector("#segment-delete-description")!.textContent = "Only assigned assets are removed. The scan elements, classification and source geometry are preserved.";
+        this.deleteDialog.showModal(); document.querySelector<HTMLButtonElement>("#segment-delete-confirm")!.focus(); return;
+      }
       if (!this.selected.size) return;
       this.deleting = { kind: "elements", ids: [...this.selected] };
       document.querySelector("#segment-delete-title")!.textContent = `Remove ${this.selected.size} elements from the list?`;
@@ -404,7 +482,7 @@ export class SegmentPanel {
   }
 
   private highlight(): void {
-    const items = this.model.segments.filter(segment => this.selected.has(segment.id));
+    const items = this.model.segments.filter(segment => this.selected.has(segment.id) || this.selectedAssets.has(segment.id));
     if (!items.length) { this.actions.clear(); return; }
     const indices = new Uint32Array(items.reduce((count, segment) => count + segment.indices.length, 0));
     let offset = 0;
@@ -427,7 +505,7 @@ export class SegmentPanel {
     return button;
   }
 
-  private eye(name: string, checked: boolean, change: (visible: boolean) => void): HTMLLabelElement {
+  private eye(name: string, checked: boolean, change: (visible: boolean) => void, asset = false): HTMLLabelElement {
     const label = document.createElement("label");
     label.className = "segment-visible classification-toggle classification-visibility";
     label.title = `${checked ? "Hide" : "Show"} ${name}`;
@@ -435,7 +513,7 @@ export class SegmentPanel {
     input.type = "checkbox";
     input.checked = checked;
     input.setAttribute("aria-label", `Show ${name}`);
-    input.addEventListener("change", () => { change(input.checked); this.changed(); });
+    input.addEventListener("change", () => { change(input.checked); if (asset) this.assetsChanged(); else this.changed(); });
     const visible = classificationIcon("eye");
     visible.classList.add("icon-visible");
     const hidden = classificationIcon("eyeOff");
@@ -478,26 +556,7 @@ export class SegmentPanel {
     row.setAttribute("aria-label", `Select mesh ${segment.name}`);
     row.setAttribute("aria-disabled", String(!this.model.isVisible(segment)));
     row.title = "Click to select · Ctrl+click to add/remove · Shift+click for a range";
-    row.addEventListener("click", event => {
-      if (event.ctrlKey || event.metaKey || event.shiftKey) event.preventDefault();
-      this.chooseObject(segment.id, event);
-    });
-    row.addEventListener("keydown", event => {
-      if (event.target !== row) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        this.chooseObject(segment.id, event);
-      }
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        const ids = this.visibleObjectIds();
-        const next = ids[ids.indexOf(segment.id) + (event.key === "ArrowDown" ? 1 : -1)];
-        if (next !== undefined) {
-          if (!event.ctrlKey && !event.metaKey) this.chooseObject(next, event);
-          this.list.querySelector<HTMLElement>(`[data-object-id="${next}"]`)?.focus();
-        }
-      }
-    });
+    this.bindRowSelection(row, segment.id, "scan");
     const icon = classificationIcon(segment.layerId === null ? "mesh" : "classifiedMesh");
     icon.classList.add("segment-mesh-icon");
     const visibility = this.eye(`mesh ${segment.name}`, segment.visible, visible => this.model.update(segment.id, { visible }));
@@ -505,13 +564,33 @@ export class SegmentPanel {
     row.append(icon,
       this.name(segment.name, `Mesh name ${segment.name}`, name => this.model.update(segment.id, { name }), 120),
       this.assignButton(() => [segment], `Assign asset to element ${segment.name}`), visibility);
-    return row;
+    const element = document.createElement("div"); element.className = "segment-element"; element.append(row);
+    if (segment.asset) element.append(this.assetRow(segment));
+    return element;
+  }
+
+  private assetRow(segment: Segment): HTMLElement {
+    const asset = segment.asset!;
+    const row = document.createElement("div"); row.className = "segment-asset-row"; row.dataset.assetId = String(segment.id);
+    row.tabIndex = 0; row.setAttribute("role", "group"); row.setAttribute("aria-label", `Select asset for ${segment.name}`);
+    row.title = "Ctrl+click to add/remove · Shift+click for an asset range";
+    this.bindRowSelection(row, segment.id, "asset");
+    const name = document.createElement("button"); name.type = "button"; name.className = "segment-asset-name"; name.textContent = asset.name;
+    name.setAttribute("aria-label", `Asset settings for ${segment.name}: ${asset.name}`); name.title = "Asset settings · Z rotation, color and assignment";
+    name.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); this.chooseRow(segment.id, "asset", event); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) this.actions.assignAssets?.([segment]); });
+    const color = document.createElement("input"); color.type = "color"; color.value = asset.color ?? this.model.layers.find(layer => layer.id === segment.layerId)?.color ?? "#69b8ee";
+    color.setAttribute("aria-label", `Color asset for ${segment.name}`); color.title = "Set custom asset color";
+    color.addEventListener("click", event => event.stopPropagation());
+    color.addEventListener("change", () => { asset.color = color.value; this.assetsChanged("custom"); });
+    const eye = this.eye(`asset for ${segment.name}`, asset.visible !== false, visible => { asset.visible = visible; }, true);
+    eye.addEventListener("click", event => event.stopPropagation());
+    row.append(classificationIcon("mesh"), name, color, eye); return row;
   }
 
   private matches(segment: Segment): boolean {
     const layer = this.model.layers.find(layer => layer.id === segment.layerId);
     const group = this.model.groups.find(group => group.id === layer?.groupId);
-    return `${segment.name} ${layer?.name ?? "Unclassified"} ${group?.name ?? ""}`.toLocaleLowerCase().includes(this.filter);
+    return `${segment.name} ${segment.asset?.name ?? ""} ${layer?.name ?? "Unclassified"} ${group?.name ?? ""}`.toLocaleLowerCase().includes(this.filter);
   }
 
   private layer(layer: SegmentLayer): HTMLElement {
@@ -574,6 +653,9 @@ export class SegmentPanel {
   }
 
   private render(): void {
+    let pruned = false;
+    for (const id of this.selectedAssets) if (!this.model.segments.some(row => row.id === id && row.asset)) { this.selectedAssets.delete(id); pruned = true; }
+    if (pruned) { if (!this.selectedAssets.size) this.assetAnchor = undefined; this.highlight(); }
     this.refreshOptions();
     this.list.replaceChildren();
     document.querySelector("#segment-count")!.textContent = String(this.model.segments.length);
@@ -598,9 +680,16 @@ export class SegmentPanel {
     this.markSelection();
   }
 
+  private syncAssets(): void {
+    const colorMode = this.assetColorMode.value === "layer" || this.assetColorMode.value === "custom" ? this.assetColorMode.value : "original";
+    this.actions.syncAssets?.(this.model.segments, segment => this.model.isAssetVisible(segment), { colorMode, layerColors: new Map(this.model.layers.map(layer => [layer.id, layer.color])), highlighted: new Set([...this.selected, ...this.selectedAssets]) });
+  }
+
   private paint(): void {
-    this.actions.syncAssets?.(this.model.segments, segment => this.model.isVisible(segment));
+    this.syncAssets();
     if (!this.mesh) return;
+    this.mesh.visible = this.model.scanVisible;
+    if (!this.model.scanVisible) { this.release(); return; }
     const visible = this.visibility();
     if (!visible && (!this.colors.checked || !this.model.segments.some(segment => segment.layerId !== null))) { this.release(); return; }
     if (!this.rgba) {

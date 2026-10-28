@@ -7,7 +7,7 @@ export interface Segment {
   visible: boolean;
   indices: Uint32Array;
   pose?: ElementPose;
-  asset?: { id: string; name: string; correctionZ: number; scale: number; sourceUp?: "y" | "z" };
+  asset?: { id: string; name: string; correctionZ: number; scale: number; sourceUp?: "y" | "z"; visible?: boolean; color?: string };
 }
 export interface SegmentGroup { id: number; name: string; visible: boolean }
 export interface SegmentLayer { id: number; name: string; groupId: number | null; visible: boolean; color: string; nextElementNumber: number }
@@ -21,6 +21,8 @@ export class SegmentCollection {
   classifiedVisible = true;
   unclassifiedVisible = true;
   contextVisible = true;
+  scanVisible = true;
+  assetsVisible = true;
   private count = 0;
   private nextId = 1;
 
@@ -35,6 +37,7 @@ export class SegmentCollection {
     }
     this.classifiedVisible = this.unclassifiedVisible = true;
     this.contextVisible = true;
+    this.scanVisible = this.assetsVisible = true;
   }
 
   add(labels: Uint8Array, description: string): number {
@@ -158,14 +161,21 @@ export class SegmentCollection {
   }
 
   isVisible(segment: Segment): boolean {
-    if (!segment.visible) return false;
+    return this.scanVisible && segment.visible && this.containerVisible(segment);
+  }
+
+  isAssetVisible(segment: Segment): boolean {
+    return this.assetsVisible && Boolean(segment.asset) && segment.asset?.visible !== false && this.containerVisible(segment);
+  }
+
+  private containerVisible(segment: Segment): boolean {
     if (segment.layerId === null) return this.unclassifiedVisible;
     const layer = this.layers.find(layer => layer.id === segment.layerId);
     return Boolean(this.classifiedVisible && layer?.visible && !this.groups.some(group => group.id === layer.groupId && !group.visible));
   }
 
   visibility(): Uint8Array {
-    const visible = new Uint8Array(this.count).fill(Number(this.contextVisible && this.unclassifiedVisible));
+    const visible = new Uint8Array(this.count).fill(Number(this.scanVisible && this.contextVisible && this.unclassifiedVisible));
     for (const segment of this.segments) {
       const value = Number(this.isVisible(segment));
       for (const index of segment.indices) visible[index] = value;

@@ -219,3 +219,16 @@ it("returns objects to Unclassified when a layer is removed and keeps target ind
   scene.unclassifiedVisible = false;
   expect([...scene.visibility()]).toEqual([0, 0, 0]);
 });
+
+it("separates scan and asset visibility while containers remain shared masters", () => {
+  const model = new SegmentCollection(); model.reset(2); model.add(new Uint8Array([1,0]), "light");
+  const layer = model.createLayer("Lights"), row = model.segments[0]!;
+  row.layerId = layer.id; row.asset = { id: "a", name: "Lamp", correctionZ: 0, scale: 1 };
+  row.visible = false;
+  expect(model.isVisible(row)).toBe(false); expect(model.isAssetVisible(row)).toBe(true);
+  model.scanVisible = false; expect([...model.visibility()]).toEqual([0,0]); expect(model.isAssetVisible(row)).toBe(true);
+  row.visible = true; model.scanVisible = true; row.asset.visible = false;
+  expect(model.isVisible(row)).toBe(true); expect(model.isAssetVisible(row)).toBe(false);
+  row.asset.visible = true; layer.visible = false; expect(model.isAssetVisible(row)).toBe(false);
+  layer.visible = true; model.assetsVisible = false; expect(model.isAssetVisible(row)).toBe(false); expect(model.isVisible(row)).toBe(true);
+});

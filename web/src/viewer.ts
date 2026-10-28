@@ -108,7 +108,7 @@ async function start(): Promise<void> {
     onSegments: (labels, prompt) => { selection.clear(); segments.add(labels, prompt); },
     isolateContext: () => {
       const bimVisible = bimGroup.visible;
-      const scanVisible = scanGroup.visible;
+      const scanVisible = segments.isScanVisible;
       const gridVisible = grid.visible;
       const position = camera.position.clone();
       const target = controls.target.clone();
@@ -118,14 +118,14 @@ async function start(): Promise<void> {
       const ifcVisible = element("ifc-visible", HTMLInputElement);
       const plyVisible = element("ply-visible", HTMLInputElement);
       bimGroup.visible = false;
-      scanGroup.visible = true;
+      segments.setScanVisibility(true, { preserveSelection: true });
       grid.visible = false;
       ifcVisible.checked = false;
       plyVisible.checked = true;
       ifcVisible.disabled = plyVisible.disabled = true;
       return () => {
         bimGroup.visible = ifcVisible.checked = bimVisible;
-        scanGroup.visible = plyVisible.checked = scanVisible;
+        segments.setScanVisibility(scanVisible, { preserveSelection: true }); plyVisible.checked = scanVisible;
         grid.visible = gridVisible;
         camera.position.copy(position);
         controls.target.copy(target);
@@ -144,13 +144,14 @@ async function start(): Promise<void> {
   const segments = new SegmentPanel({
     select: indices => selection.selectIndices(indices), clear: () => selection.clear(), error: showError,
     assignAssets: elements => { void assetAssignment?.open(elements).catch(showError); },
-    syncAssets: (elements, visible) => assetAssignment?.sync(elements, visible),
+    syncAssets: (elements, visible, presentation) => assetAssignment?.sync(elements, visible, presentation),
     resetAssets: () => assetAssignment?.reset(),
+    scanVisibilityChanged: visible => { element("ply-visible", HTMLInputElement).checked = visible; },
   });
-  assetAssignment = new AssetAssignmentControls(placedAssets, () => segments.assetsChanged());
+  assetAssignment = new AssetAssignmentControls(placedAssets, mode => segments.assetsChanged(mode));
 
   const lights = new LightDetectionControls(() => {
-    if (!splats || !scanGroup.visible)
+    if (!splats || !segments.isScanVisible)
       throw new Error("Show the Gaussian scan before detecting objects.");
     segments.clearSelection();
     const select = selection.captureMaskSelection();
@@ -401,7 +402,7 @@ async function start(): Promise<void> {
     "change",
     (event) => {
       if (event.target instanceof HTMLInputElement)
-        scanGroup.visible = event.target.checked;
+        segments.setScanVisibility(event.target.checked);
     },
   );
   fitAll.addEventListener("click", frameScene);

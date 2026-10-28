@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs";
 import { afterEach, expect, it, vi } from "vitest";
 import { SegmentPanel } from "./segments";
 
-vi.mock("@sparkjsdev/spark", () => ({ dyno: {}, readRgbaArray: vi.fn(), SplatMesh: class {} }));
-vi.mock("./asset-selection", () => ({ createSelectionTexture: vi.fn() }));
+vi.mock("@sparkjsdev/spark", () => ({ dyno: { dynoBlock: vi.fn(() => ({})), Gsplat: {} }, readRgbaArray: vi.fn(), SplatMesh: class {} }));
+vi.mock("./asset-selection", () => ({ createSelectionTexture: (count: number) => ({ array: new Uint8Array(count * 4), dispose: vi.fn(), dyno: {} }) }));
 
 // Minimal DOM boundary for exercising real panel event handlers, not a second panel implementation.
 class Control extends EventTarget {
@@ -125,7 +125,8 @@ function workspace() {
   });
   const errors = vi.fn();
   const assignAssets = vi.fn();
-  const panel = new SegmentPanel({ select: vi.fn(), clear: vi.fn(), error: errors, assignAssets });
+  const clear = vi.fn();
+  const panel = new SegmentPanel({ select: vi.fn(), clear, error: errors, assignAssets });
   const descendants = (node: Control): Control[] => node.children.flatMap(child => [child, ...descendants(child)]);
   const named = (label: string, root = "segment-list"): Control => {
     const item = descendants(get(root)).find(item => item.attributes.get("aria-label") === label);
@@ -137,7 +138,7 @@ function workspace() {
     get(`segment-${kind}-name`).value = name;
     get(`segment-${kind}-form`).fire("submit");
   };
-  return { get, panel, named, create, errors, documentNode, assignAssets };
+  return { get, panel, named, create, errors, documentNode, assignAssets, clear };
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -675,4 +676,83 @@ it.each(["ifc", undefined] as const)("locks IFC source axes with catalog kind %s
   expect(parent.children[0]!.rotation.y).toBe(0);
   expect(parent.children[0]!.rotation.z).toBeCloseTo(Math.PI / 3);
   loader.mockRestore(); controls.dispose(); app.panel.dispose();
+});
+
+function assignedRows(app: ReturnType<typeof workspace>, count = 3): Segment[] {
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: count, updateVersion() {} } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(Uint8Array.from({ length: count }, (_, i) => i + 1), "light");
+  app.get("segment-classify").fire("click"); app.get("segment-name-form").fire("submit");
+  app.named("Assign asset to layer Lighting").fire("click");
+  const rows: Segment[] = app.assignAssets.mock.lastCall![0];
+  for (const row of rows) row.asset = { id: "lamp", name: "Linear-Light", correctionZ: 0, scale: 1 };
+  app.panel.assetsChanged(); return rows;
+}
+
+it("shows asset child rows and keeps scan and asset master toggles before layer colors", () => {
+  const app = workspace(), rows = assignedRows(app);
+  expect(app.named("Asset settings for Lighting 01: Linear-Light").textContent).toBe("Linear-Light");
+  const tools = app.get("segment-colors").parent!.parent!;
+  expect(tools.children.indexOf(app.get("segment-scan-visible").parent!)).toBeLessThan(tools.children.indexOf(app.get("segment-colors").parent!));
+  expect(tools.children.indexOf(app.get("segment-assets-visible").parent!)).toBeLessThan(tools.children.indexOf(app.get("segment-colors").parent!));
+  app.get("segment-scan-visible").checked = false; app.get("segment-scan-visible").fire("change");
+  expect([...app.panel.visibility()!]).toEqual([0,0,0]);
+  expect(rows.every(row => row.asset!.visible !== false)).toBe(true);
+  app.named("Show asset for Lighting 01").checked = false; app.named("Show asset for Lighting 01").fire("change");
+  expect(rows[0]!.asset!.visible).toBe(false); expect(rows[0]!.visible).toBe(true);
+  app.panel.dispose();
+});
+it("selects asset rows with Ctrl and Shift then applies bulk visibility/color", () => {
+  const app = workspace(), rows = assignedRows(app);
+  app.named("Select asset for Lighting 01").fire("click");
+  app.named("Select asset for Lighting 03").fire("click", undefined, { ctrlKey: true });
+  app.get("segment-assets-hide").fire("click");
+  expect(rows.map(row => row.asset!.visible)).toEqual([false, undefined, false]);
+  app.named("Select asset for Lighting 01").fire("click");
+  app.named("Select asset for Lighting 03").fire("click", undefined, { shiftKey: true });
+  app.get("segment-assets-color").value = "#ff0000"; app.get("segment-assets-color").fire("input");
+  expect(rows.every(row => row.asset!.color === "#ff0000")).toBe(true);
+  expect(app.get("segment-asset-colors").value).toBe("custom");
+  app.get("segment-assets-show").fire("click"); expect(rows.every(row => row.asset!.visible)).toBe(true);
+  app.panel.dispose();
+});
+it("selects all assets, opens one asset settings scope and deletes assignments only", () => {
+  const app = workspace(), rows = assignedRows(app);
+  app.get("segment-assets-all").fire("click");
+  expect(app.get("segment-asset-selection-count").textContent).toContain("3 assets");
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-description").textContent).toContain("scan elements");
+  app.get("segment-delete-form").fire("submit");
+  expect(rows.every(row => !row.asset)).toBe(true);
+  expect(app.named("Mesh name Lighting 01").value).toBe("Lighting 01");
+  rows[0]!.asset = { id: "lamp", name: "Linear-Light", correctionZ: 0, scale: 1 };
+  app.panel.assetsChanged(); app.named("Asset settings for Lighting 01: Linear-Light").fire("click");
+  expect(app.assignAssets.mock.lastCall![0]).toEqual([rows[0]]);
+  app.panel.dispose();
+});
+
+it("asset settings apply custom colors and remove only assignments", async () => {
+  const app = workspace(), placed = new PlacedAssets(new Group(), []);
+  const row: Segment = { id: 1, name: "Light", visible: true, layerId: 5, indices: new Uint32Array([0]), pose: { position: [0,0,0], z: 0, rotationReliable: true }, asset: { id: "lamp", name: "Lamp", correctionZ: 0, scale: 1 } };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]")));
+  const changed = vi.fn(); const controls = new AssetAssignmentControls(placed, changed);
+  controls.sync([row], () => true); await controls.open([row]);
+  app.get("asset-settings-color").value = "#00ff00"; app.get("asset-apply-color").fire("click");
+  expect(row.asset!.color).toBe("#00ff00"); expect(changed).toHaveBeenCalledWith("custom");
+  app.get("asset-remove-assignment").fire("click");
+  expect(row.asset).toBeUndefined(); expect(row.indices).toEqual(new Uint32Array([0])); expect(row.layerId).toBe(5);
+  controls.dispose(); app.panel.dispose();
+});
+
+it("preserves selection when isolation temporarily synchronizes scan visibility", () => {
+  const app = workspace(); assignedRows(app);
+  app.named("Select asset for Lighting 01").fire("click");
+  app.clear.mockClear();
+  app.panel.setScanVisibility(false, { preserveSelection: true });
+  app.panel.setScanVisibility(true, { preserveSelection: true });
+  expect(app.clear).not.toHaveBeenCalled();
+  expect(app.get("segment-asset-selection-count").textContent).toContain("1 asset");
+  app.panel.setScanVisibility(false);
+  expect(app.clear).toHaveBeenCalledOnce();
+  app.panel.dispose();
 });

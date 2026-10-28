@@ -132,3 +132,9 @@ Development-mode asset assignment: Vite pre-optimizes `web-ifc` at startup. With
 ```powershell
 node.exe --test scripts/test-asset-worker-reload.mjs
 ```
+
+## Model Browser: scan and assigned assets
+
+The top Scan and Assets switches independently hide/show those representations, before the classification-color toggle. Group, layer and root eyes gate both; each element eye affects only its scan geometry. Assigned assets appear as indented children with their own eye and color. Click the asset name for assignment settings, Z correction, color or removal.
+
+Ctrl-click toggles asset selection; Shift-click selects a visible range. All assets reveals/selects every assignment. Use Show, Hide and the color swatch for the selected assets. Asset color modes are Original, By layer and Custom. Selecting an asset highlights its source element too. Delete on selected asset rows removes assignments, retaining the source elements and scan geometry. Assignments and classification remain session-only.

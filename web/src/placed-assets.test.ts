@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { Box3, Group, Vector3 } from "three";
+import { Box3, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
 import { normalizedAsset, parseGeometry } from "./asset-geometry";
 import { PlacedAssets } from "./placed-assets";
 import type { Segment } from "./segments-model";
@@ -44,4 +44,21 @@ it("matches the library's Y-input to Z-display conversion exactly once", () => {
   expect(converted.x).toBeCloseTo(4); expect(converted.y).toBeCloseTo(1); expect(converted.z).toBeCloseTo(2);
   const alreadyZ = new Box3().setFromObject(normalizedAsset(geometry, "z")).getSize(new Vector3());
   expect(alreadyZ.x).toBeCloseTo(4); expect(alreadyZ.y).toBeCloseTo(2); expect(alreadyZ.z).toBeCloseTo(1);
+});
+
+it("uses private material colors and linked highlights without modifying shared geometry", () => {
+  const parent = new Group(), assets = new PlacedAssets(parent, []);
+  assets.cache("a", normalizedAsset(parseGeometry(payload), "z"));
+  const rows: Segment[] = [1,2].map(id => ({ id, name: "Light", visible: true, layerId: 7, indices: new Uint32Array([id]), pose: { position: [id,0,0], z: 0, rotationReliable: true }, asset: { id: "a", name: "Lamp", correctionZ: 0, scale: 1, color: id === 1 ? "#ff0000" : "#00ff00" } }));
+  assets.sync(rows, () => true, { colorMode: "custom", layerColors: new Map([[7,"#0000ff"]]), highlighted: new Set([1]) });
+  const first = parent.children[0]!.children[0], second = parent.children[1]!.children[0];
+  if (!(first instanceof Mesh) || !(second instanceof Mesh) || !(first.material instanceof MeshStandardMaterial) || !(second.material instanceof MeshStandardMaterial)) throw new Error("Missing asset mesh");
+  expect(first.geometry).toBe(second.geometry); expect(first.material).not.toBe(second.material);
+  expect(first.material.color.getHexString()).toBe("ff0000"); expect(second.material.color.getHexString()).toBe("00ff00");
+  expect(first.material.emissive.getHex()).not.toBe(0); expect(second.material.emissive.getHex()).toBe(0);
+  assets.sync(rows, () => true, { colorMode: "layer", layerColors: new Map([[7,"#0000ff"]]), highlighted: new Set() });
+  expect(first.material.color.getHexString()).toBe("0000ff"); expect(first.material.emissive.getHex()).toBe(0);
+  assets.sync(rows, () => true);
+  expect(first.material.color.getHexString()).toBe("ffffff"); expect(second.material.color.getHexString()).toBe("ffffff");
+  assets.clear();
 });

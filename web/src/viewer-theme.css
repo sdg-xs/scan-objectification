@@ -89,3 +89,8 @@ kbd, .segments-panel > summary, .segment-tree, .segment-tree .segment-tree { bor
 .crosshair { color: #b9c5d3; }
 .file-status[data-error="true"], #light-status[data-error="true"] { color: #a53e36; }
 #viewer-error { background: #fff1ee; color: #a53e36; border-color: #edc3bc; }
+
+.segment-asset-row[data-selected="true"] { background: var(--accent-soft); }
+.segment-object-row[data-linked="true"], .segment-asset-row[data-linked="true"] { box-shadow: inset 2px 0 var(--accent); }
+.segments-panel .segment-asset-name { color: var(--accent); }
+#segment-asset-selection-count { color: var(--muted); }
