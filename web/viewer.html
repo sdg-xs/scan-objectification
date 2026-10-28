@@ -231,32 +231,23 @@
           </div>
         </details>
         <dialog id="asset-assignment-dialog" class="segment-dialog asset-assignment-dialog" aria-labelledby="asset-assignment-title">
-          <h3 id="asset-assignment-title">Assign asset</h3>
+          <h3 id="asset-assignment-title">Asset Library</h3>
           <p id="asset-assignment-scope"></p>
-          <p class="hint">Uses recorded center and estimated Z rotation. Original scan geometry stays in place. Placements last for this loaded scan.</p>
-          <details><summary>Recorded element poses</summary><div id="asset-pose-list" class="asset-pose-list"></div></details>
-          <label>Z rotation correction (degrees)<input id="asset-rotation-correction" type="number" min="-360" max="360" step="1" value="0" /></label>
-          <p class="hint">Added to each detected angle. Use 180° to reverse a linear asset’s direction.</p>
-          <button id="asset-correct-rotation" type="button">Update existing asset rotation</button>
-          <div class="asset-placement-options">
-            <label>Asset color<input id="asset-settings-color" type="color" value="#69b8ee" /></label>
-            <button id="asset-apply-color" type="button">Apply color to existing assets</button>
-            <button id="asset-remove-assignment" type="button">Remove assignment · keep scan</button>
-          </div>
-          <hr />
-          <label>Search library<input id="asset-library-filter" type="search" placeholder="Name or category" /></label>
-          <label>Category<select id="asset-library-category"><option value="">All categories</option></select></label>
-          <label>Asset<select id="asset-library-choice" size="7" aria-label="Choose library asset"></select></label>
-          <div class="asset-placement-options">
-            <label>Geometry input axis<select id="asset-source-up"><option value="y">Library input (Y → Z)</option><option value="z">Already Z-up</option></select></label>
-            <label>Asset unit scale<select id="asset-unit-scale"><option value="1">1:1 (metres)</option><option value="0.001">Millimetres → metres</option><option value="0.01">Centimetres → metres</option></select></label>
-          </div>
-          <p class="hint">Assets display Z-up, matching the library preview. IFC orientation is automatic; the input-axis override applies to saved mesh files only.</p>
+          <div id="asset-library-picker"></div>
           <p id="asset-assignment-status" role="status"></p>
           <div class="segment-delete-actions">
             <button id="asset-assignment-apply" type="button" disabled>Assign asset</button>
             <button id="asset-library-retry" type="button">Reload library</button>
             <button id="asset-assignment-close" type="button">Close</button>
+          </div>
+        </dialog>
+        <dialog id="asset-preview-dialog" class="segment-dialog asset-preview-dialog" aria-labelledby="asset-preview-title">
+          <h3 id="asset-preview-title">Asset preview</h3>
+          <div id="asset-preview-viewport"></div>
+          <p id="asset-preview-status" role="status"></p>
+          <div class="segment-delete-actions">
+            <button id="asset-preview-assign" type="button">Assign asset</button>
+            <button id="asset-preview-close" type="button">Close preview</button>
           </div>
         </dialog>
         <section id="target-layer-window" class="target-layer-window segment-classification-footer" aria-label="Target layer and classification">

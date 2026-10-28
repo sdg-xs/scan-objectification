@@ -232,3 +232,16 @@ it("separates scan and asset visibility while containers remain shared masters",
   row.asset.visible = true; layer.visible = false; expect(model.isAssetVisible(row)).toBe(false);
   layer.visible = true; model.assetsVisible = false; expect(model.isAssetVisible(row)).toBe(false); expect(model.isVisible(row)).toBe(true);
 });
+
+it("controls scans and assets independently per layer without changing child settings", () => {
+  const model = new SegmentCollection(); model.reset(1); model.add(new Uint8Array([1]), "light");
+  const layer = model.createLayer("Lighting"), row = model.segments[0]!;
+  row.layerId = layer.id; row.asset = { id: "lamp", name: "Lamp", scale: 1, correctionZ: 0 };
+  layer.scanVisible = false;
+  expect(model.isVisible(row)).toBe(false); expect(model.isAssetVisible(row)).toBe(true);
+  expect(row.visible).toBe(true);
+  layer.scanVisible = true; layer.assetsVisible = false;
+  expect(model.isVisible(row)).toBe(true); expect(model.isAssetVisible(row)).toBe(false);
+  expect(row.asset.visible).toBeUndefined();
+  layer.assetsVisible = true; expect(model.isAssetVisible(row)).toBe(true);
+});

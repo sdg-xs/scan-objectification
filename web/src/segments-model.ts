@@ -10,7 +10,7 @@ export interface Segment {
   asset?: { id: string; name: string; correctionZ: number; scale: number; sourceUp?: "y" | "z"; visible?: boolean; color?: string };
 }
 export interface SegmentGroup { id: number; name: string; visible: boolean }
-export interface SegmentLayer { id: number; name: string; groupId: number | null; visible: boolean; color: string; nextElementNumber: number }
+export interface SegmentLayer { id: number; name: string; groupId: number | null; visible: boolean; scanVisible?: boolean; assetsVisible?: boolean; color: string; assetColor?: string; nextElementNumber: number }
 
 /** Session-only source IDs. A splat belongs to at most one segment. */
 export class SegmentCollection {
@@ -79,7 +79,7 @@ export class SegmentCollection {
     const existing = this.layers.find(layer => layer.groupId === groupId && layer.name.toLocaleLowerCase() === name.toLocaleLowerCase());
     if (existing) return existing;
     const palette = ["#69b8ee", "#b590e2", "#83c97d", "#e7bd68", "#e689a9"];
-    const layer = { id: this.nextId++, name, groupId, visible: true, color: palette[this.layers.length % palette.length]!, nextElementNumber: 1 };
+    const layer = { id: this.nextId++, name, groupId, visible: true, scanVisible: true, assetsVisible: true, color: palette[this.layers.length % palette.length]!, assetColor: palette[this.layers.length % palette.length]!, nextElementNumber: 1 };
     this.layers.push(layer);
     return layer;
   }
@@ -161,11 +161,11 @@ export class SegmentCollection {
   }
 
   isVisible(segment: Segment): boolean {
-    return this.scanVisible && segment.visible && this.containerVisible(segment);
+    return this.scanVisible && segment.visible && this.layers.find(layer => layer.id === segment.layerId)?.scanVisible !== false && this.containerVisible(segment);
   }
 
   isAssetVisible(segment: Segment): boolean {
-    return this.assetsVisible && Boolean(segment.asset) && segment.asset?.visible !== false && this.containerVisible(segment);
+    return this.assetsVisible && Boolean(segment.asset) && segment.asset?.visible !== false && this.layers.find(layer => layer.id === segment.layerId)?.assetsVisible !== false && this.containerVisible(segment);
   }
 
   private containerVisible(segment: Segment): boolean {

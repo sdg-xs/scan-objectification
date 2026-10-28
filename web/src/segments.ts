@@ -55,7 +55,6 @@ export class SegmentPanel {
     classificationToggle(this.colors, "colors", "Display scan classification colors (off: original colors)");
     for (const [input, icon, name] of [[this.scanVisible, "unclassified", "Scan"], [this.assetsVisible, "classifiedMesh", "Assets"]] as const) {
       classificationToggle(input, icon, `Show ${name.toLowerCase()} (master visibility)`);
-      const caption = document.createElement("span"); caption.textContent = name; input.closest("label")!.append(caption);
     }
     this.assetColorMode.value = "original";
     this.scanVisible.addEventListener("change", () => this.setScanVisibility(this.scanVisible.checked), { signal });
@@ -575,16 +574,11 @@ export class SegmentPanel {
     row.tabIndex = 0; row.setAttribute("role", "group"); row.setAttribute("aria-label", `Select asset for ${segment.name}`);
     row.title = "Ctrl+click to add/remove · Shift+click for an asset range";
     this.bindRowSelection(row, segment.id, "asset");
-    const name = document.createElement("button"); name.type = "button"; name.className = "segment-asset-name"; name.textContent = asset.name;
-    name.setAttribute("aria-label", `Asset settings for ${segment.name}: ${asset.name}`); name.title = "Asset settings · Z rotation, color and assignment";
-    name.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); this.chooseRow(segment.id, "asset", event); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) this.actions.assignAssets?.([segment]); });
-    const color = document.createElement("input"); color.type = "color"; color.value = asset.color ?? this.model.layers.find(layer => layer.id === segment.layerId)?.color ?? "#69b8ee";
-    color.setAttribute("aria-label", `Color asset for ${segment.name}`); color.title = "Set custom asset color";
-    color.addEventListener("click", event => event.stopPropagation());
-    color.addEventListener("change", () => { asset.color = color.value; this.assetsChanged("custom"); });
+    const name = document.createElement("span"); name.className = "segment-asset-name"; name.textContent = asset.name;
+    name.setAttribute("aria-label", `Asset name for ${segment.name}`);
     const eye = this.eye(`asset for ${segment.name}`, asset.visible !== false, visible => { asset.visible = visible; }, true);
     eye.addEventListener("click", event => event.stopPropagation());
-    row.append(classificationIcon("mesh"), name, color, eye); return row;
+    row.append(classificationIcon("mesh"), name, eye); return row;
   }
 
   private matches(segment: Segment): boolean {
@@ -602,12 +596,20 @@ export class SegmentPanel {
     const color = document.createElement("input");
     color.type = "color";
     color.value = layer.color;
-    color.setAttribute("aria-label", `Color of layer ${layer.name}`);
-    color.title = `Change color of layer ${layer.name}`;
-    color.addEventListener("input", () => { layer.color = color.value; this.paint(); });
+    color.setAttribute("aria-label", `Scan color of layer ${layer.name}`);
+    color.title = `Change scan color of layer ${layer.name}`;
+    color.addEventListener("input", () => { layer.color = color.value; this.colors.checked = true; this.colors.dispatchEvent(new Event("change")); });
+    const assetColor = document.createElement("input"); assetColor.type = "color"; assetColor.value = layer.assetColor ?? layer.color;
+    assetColor.setAttribute("aria-label", `Asset color of layer ${layer.name}`); assetColor.title = `Change asset color of layer ${layer.name}`;
+    assetColor.addEventListener("input", () => { layer.assetColor = assetColor.value; this.assetColorMode.value = "layer"; this.syncAssets(); });
+    const scanEye = this.eye(`scans in layer ${layer.name}`, layer.scanVisible !== false, visible => { layer.scanVisible = visible; });
+    const assetEye = this.eye(`assets in layer ${layer.name}`, layer.assetsVisible !== false, visible => { layer.assetsVisible = visible; }, true);
+    classificationToggle(scanEye.querySelector<HTMLInputElement>("input")!, "unclassified", `Show scans in layer ${layer.name}`);
+    classificationToggle(assetEye.querySelector<HTMLInputElement>("input")!, "classifiedMesh", `Show assets in layer ${layer.name}`);
     const target = this.button("activeLayer", `Set active layer ${layer.name}`, () => this.setActiveLayer(layer.id));
     target.setAttribute("aria-pressed", String(this.model.targetLayerId === layer.id));
-    row.replaceChildren(classificationIcon("layerItem"), name, color, target, this.assignButton(() => this.model.segments.filter(segment => segment.layerId === layer.id), `Assign asset to layer ${layer.name}`), this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }));
+    row.replaceChildren(classificationIcon("layerItem"), name, target, scanEye, color, assetEye, assetColor,
+      this.assignButton(() => this.model.segments.filter(segment => segment.layerId === layer.id), `Assign asset to layer ${layer.name}`));
     this.chooseContainer(row, "layer", layer.id);
     const group = document.createElement("select");
     group.className = "segment-layer-group";
@@ -682,7 +684,7 @@ export class SegmentPanel {
 
   private syncAssets(): void {
     const colorMode = this.assetColorMode.value === "layer" || this.assetColorMode.value === "custom" ? this.assetColorMode.value : "original";
-    this.actions.syncAssets?.(this.model.segments, segment => this.model.isAssetVisible(segment), { colorMode, layerColors: new Map(this.model.layers.map(layer => [layer.id, layer.color])), highlighted: new Set([...this.selected, ...this.selectedAssets]) });
+    this.actions.syncAssets?.(this.model.segments, segment => this.model.isAssetVisible(segment), { colorMode, layerColors: new Map(this.model.layers.map(layer => [layer.id, layer.assetColor ?? layer.color])), highlighted: new Set([...this.selected, ...this.selectedAssets]) });
   }
 
   private paint(): void {

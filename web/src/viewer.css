@@ -642,14 +642,53 @@ kbd {
 .segment-operations { justify-content: flex-start; }
 [hidden] { display: none !important; }
 
-.asset-assignment-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
-.asset-assignment-dialog > label { display: grid; gap: 6px; margin: 12px 0; }
-.asset-assignment-dialog select[size] { width: 100%; min-height: 150px; }
-.asset-assignment-dialog select[size] option { padding: 6px; }
-.asset-placement-options { display: flex; flex-wrap: wrap; gap: 12px; }
-.asset-placement-options label { display: grid; gap: 6px; flex: 1; }
-.asset-pose-list { max-height: 160px; overflow: auto; font-size: 11px; }
-.asset-pose-list p { margin: 6px 0; }
+.asset-assignment-dialog, .asset-preview-dialog {
+  --accent: #1769e0;
+  --muted: #667085;
+  --line: #e3e8ef;
+  color-scheme: light;
+  color: #172033;
+  background: #fff;
+  border-color: var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+  font-weight: 400;
+}
+.asset-assignment-dialog::backdrop, .asset-preview-dialog::backdrop { background: rgb(23 32 51 / 24%); }
+.asset-assignment-dialog { width: min(960px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
+.asset-assignment-dialog h3, .asset-preview-dialog h3 { color: #172033; font-weight: 600; }
+#asset-assignment-scope, #asset-assignment-status, #asset-preview-status { color: var(--muted); font-size: 12px; }
+.asset-assignment-dialog .asset-library-search { display: grid; gap: 6px; margin: 16px 0; font-size: 13px; }
+.asset-library-search input { width: 100%; background: #fff; color: #172033; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+.asset-library-search input::placeholder { color: #8290a6; }
+.asset-library-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; min-height: 350px; }
+#asset-library-categories { display: flex; flex-direction: column; gap: 5px; padding-right: 14px; border-right: 1px solid var(--line); max-height: 52dvh; overflow: auto; scrollbar-width: thin; }
+#asset-library-categories button { text-align: left; white-space: normal; background: transparent; border-color: transparent; color: #172033; font-weight: 400; font-size: 13px; line-height: 1.5; padding: 10px 12px; flex-shrink: 0; overflow-wrap: anywhere; }
+#asset-library-categories button:hover:not(:disabled), #asset-library-categories button[aria-pressed="true"] { background: #f1f5f9; color: #172033; border-color: transparent; }
+.asset-library-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); align-content: start; gap: 12px; max-height: 52dvh; overflow: auto; padding: 2px 4px 8px 2px; scrollbar-width: thin; }
+.asset-library-card { position: relative; min-width: 0; }
+.asset-card-select { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 185px; text-align: left; padding: 0; gap: 0; background: #fff; color: #172033; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; transition: border-color 150ms, box-shadow 150ms; }
+.asset-card-select:hover:not(:disabled) { background: #fff; border-color: #d8e3f2; box-shadow: 0 4px 12px rgb(0 0 0 / 6%); }
+.asset-card-select[aria-pressed="true"], .asset-card-select[aria-pressed="true"]:hover:not(:disabled) { background: #f6faff; border-color: #1769e0; box-shadow: inset 0 0 0 1px #1769e0; }
+.asset-card-art { display: grid; place-items: center; height: 90px; width: 100%; flex-shrink: 0; color: #8290a6; background: #f7faff; border-bottom: 1px solid var(--line); }
+.asset-card-art svg { width: 42px; height: 42px; }
+.asset-card-category { margin: 14px 14px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.asset-card-select strong { margin: 0 14px 48px; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; font-weight: 600; }
+.asset-card-preview { position: absolute; bottom: 10px; right: 10px; width: 30px; height: 30px; padding: 2px; font-size: 20px; color: #1769e0; background: #eaf1ff; border-color: transparent; }
+.asset-card-preview:hover:not(:disabled) { background: #dce9ff; }
+.asset-assignment-dialog .segment-delete-actions button, .asset-preview-dialog .segment-delete-actions button { color: #172033; background: #fff; border-color: var(--line); }
+.asset-assignment-dialog .segment-delete-actions button:hover:not(:disabled), .asset-preview-dialog .segment-delete-actions button:hover:not(:disabled) { background: #f1f5f9; }
+#asset-assignment-apply, #asset-preview-assign { color: #fff; background: #1769e0; border-color: #1769e0; }
+#asset-assignment-apply:hover:not(:disabled), #asset-preview-assign:hover:not(:disabled) { background: #125ac1; border-color: #125ac1; }
+.asset-preview-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
+#asset-preview-viewport { height: min(440px, 55dvh); background: #eef2f3; border-radius: 5px; overflow: hidden; touch-action: none; }
+#asset-preview-viewport canvas { display: block; width: 100%; height: 100%; }
+@media (prefers-reduced-motion: reduce) { .asset-card-select { transition: none; } }
+@media (max-width: 600px) {
+  .asset-library-layout { grid-template-columns: 1fr; gap: 12px; }
+  #asset-library-categories { flex-direction: row; border-right: 0; padding: 0 0 8px; }
+  #asset-library-categories button { flex-shrink: 0; }
+}
 
 .segments-panel .segment-master-toggle { width: auto; gap: 4px; font-size: 10px; }
 .segment-asset-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; flex-shrink: 0; }

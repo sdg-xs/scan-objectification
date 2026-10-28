@@ -1,7 +1,3 @@
-import * as libraryClient from "./asset-library-client";
-import { Group } from "three";
-import { AssetAssignmentControls } from "./asset-assignment";
-import { PlacedAssets } from "./placed-assets";
 import type { Segment } from "./segments-model";
 import { readFileSync } from "node:fs";
 import { afterEach, expect, it, vi } from "vitest";
@@ -126,7 +122,8 @@ function workspace() {
   const errors = vi.fn();
   const assignAssets = vi.fn();
   const clear = vi.fn();
-  const panel = new SegmentPanel({ select: vi.fn(), clear, error: errors, assignAssets });
+  const syncAssets = vi.fn();
+  const panel = new SegmentPanel({ select: vi.fn(), clear, error: errors, assignAssets, syncAssets });
   const descendants = (node: Control): Control[] => node.children.flatMap(child => [child, ...descendants(child)]);
   const named = (label: string, root = "segment-list"): Control => {
     const item = descendants(get(root)).find(item => item.attributes.get("aria-label") === label);
@@ -138,7 +135,7 @@ function workspace() {
     get(`segment-${kind}-name`).value = name;
     get(`segment-${kind}-form`).fire("submit");
   };
-  return { get, panel, named, create, errors, documentNode, assignAssets, clear };
+  return { get, panel, named, create, errors, documentNode, assignAssets, clear, syncAssets };
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -570,7 +567,7 @@ it("discards pending element deletion when the source is replaced", () => {
   app.panel.dispose();
 });
 
-it("assigns at element and layer scope with icons before each eye", () => {
+it("assigns at element and layer scope with assignment last on the layer row", () => {
   const app = workspace();
   app.create("layer", "Lighting");
   app.panel.setScan({ numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0]);
@@ -582,100 +579,10 @@ it("assigns at element and layer scope with icons before each eye", () => {
   button.fire("click");
   expect(app.assignAssets.mock.lastCall?.[0].map((row: { name: string }) => row.name)).toEqual(["Lighting 01"]);
   const layer = app.named("Assign asset to layer Lighting");
-  expect(layer.parent?.children.at(-2)).toBe(layer);
+  expect(layer.parent?.children.at(-1)).toBe(layer);
   layer.fire("click");
   expect(app.assignAssets.mock.lastCall?.[0]).toHaveLength(2);
   app.panel.dispose();
-});
-
-it("assigns one library geometry to every scoped element and corrects only the requested occurrence", async () => {
-  const app = workspace();
-  const parent = new Group(), placed = new PlacedAssets(parent, []);
-  const geometry = { meshes: [{ positions: [0,0,0, 2,0,0, 2,1,0], normals: [0,0,1, 0,0,1, 0,0,1], indices: [0,1,2], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] };
-  vi.stubGlobal("fetch", vi.fn(async (path: string) => new Response(JSON.stringify(path.endsWith("/geometry") ? { kind: "mesh", geometry } : [{ id: "asset-a", name: "Linear light", category: "Lighting" }]))));
-  const rows: Segment[] = [1,2].map(id => ({ id, name: `Light ${id}`, layerId: 9, indices: new Uint32Array([id]), visible: true,
-    pose: { position: [id, 2, 3], z: Math.PI / 4, rotationReliable: true } }));
-  const controls = new AssetAssignmentControls(placed, () => controls.sync(rows, () => true));
-  controls.sync(rows, () => true);
-  await controls.open(rows);
-  app.get("asset-source-up").value = "z";
-  app.get("asset-unit-scale").value = "1";
-  app.get("asset-assignment-apply").fire("click");
-  await vi.waitFor(() => expect(parent.children).toHaveLength(2));
-  expect(rows.map(row => row.asset?.id)).toEqual(["asset-a", "asset-a"]);
-  expect(parent.children[0]!.position.toArray()).toEqual([1,2,3]);
-  app.get("asset-assignment-apply").fire("click");
-  await vi.waitFor(() => expect(app.get("asset-assignment-apply").disabled).toBe(false));
-  expect(parent.children).toHaveLength(2);
-  await controls.open(rows.slice(0,1));
-  app.get("asset-rotation-correction").value = "30";
-  app.get("asset-correct-rotation").fire("click");
-  expect(rows[0]!.asset!.correctionZ).toBeCloseTo(Math.PI / 6);
-  expect(rows[1]!.asset!.correctionZ).toBe(0);
-  expect(rows[0]!.pose!.z).toBeCloseTo(Math.PI / 4);
-  controls.dispose(); app.panel.dispose();
-});
-
-it("keeps existing assignments on geometry failure and rejects stale element loads", async () => {
-  const app = workspace(), placed = new PlacedAssets(new Group(), []);
-  const rows: Segment[] = [{ id: 1, name: "Light", layerId: null, indices: new Uint32Array([0]), visible: true,
-    pose: { position: [0,0,0], z: 0, rotationReliable: false }, asset: { id: "old", name: "Original", correctionZ: 0, scale: 1 } }];
-  const controls = new AssetAssignmentControls(placed, () => {});
-  controls.sync(rows, () => true);
-  vi.stubGlobal("fetch", vi.fn(async (path: string) => path.endsWith("/geometry") ? new Response(JSON.stringify({ detail: "Missing geometry" }), { status: 404 }) : new Response(JSON.stringify([{ id: "new", name: "New", category: "Lighting" }]))));
-  await controls.open(rows);
-  app.get("asset-unit-scale").value = "1";
-  app.get("asset-assignment-apply").fire("click");
-  await vi.waitFor(() => expect(app.get("asset-assignment-status").textContent).toContain("Missing geometry"));
-  expect(rows[0]!.asset!.id).toBe("old");
-  rows[0]!.indices = new Uint32Array([1]);
-  controls.sync(rows, () => true);
-  expect(app.get("asset-assignment-dialog").open).toBe(false);
-  controls.dispose(); app.panel.dispose();
-});
-
-it("discards a geometry response arriving after its source scope is cleared", async () => {
-  const app = workspace(), parent = new Group(), placed = new PlacedAssets(parent, []);
-  const rows: Segment[] = [{ id: 1, name: "Light", layerId: null, indices: new Uint32Array([0]), visible: true,
-    pose: { position: [0,0,0], z: 0, rotationReliable: false } }];
-  let respond: ((response: Response) => void) | undefined;
-  vi.stubGlobal("fetch", vi.fn(async (path: string) => path.endsWith("/geometry")
-    ? await new Promise<Response>(resolve => { respond = resolve; })
-    : new Response(JSON.stringify([{ id: "new", name: "New", category: "Lighting" }]))));
-  const controls = new AssetAssignmentControls(placed, () => {});
-  controls.sync(rows, () => true);
-  await controls.open(rows);
-  app.get("asset-unit-scale").value = "1";
-  app.get("asset-assignment-apply").fire("click");
-  await vi.waitFor(() => expect(respond).toBeDefined());
-  controls.reset();
-  respond!(new Response(JSON.stringify({ kind: "mesh", geometry: { meshes: [{ positions: [0,0,0,1,0,0,0,1,0], normals: [0,0,1,0,0,1,0,0,1], indices: [0,1,2], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] } })));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  expect(rows[0]!.asset).toBeUndefined();
-  expect(parent.children).toHaveLength(0);
-  controls.dispose(); app.panel.dispose();
-});
-
-it.each(["ifc", undefined] as const)("locks IFC source axes with catalog kind %s so Z-only placement cannot inherit a skipped conversion", async geometryKind => {
-  const app = workspace(), parent = new Group(), placed = new PlacedAssets(parent, []);
-  const row: Segment = { id: 1, name: "Light", layerId: 1, indices: new Uint32Array([0]), visible: true,
-    pose: { position: [0,0,0], z: Math.PI / 3, rotationReliable: true } };
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([{ id: "ifc-light", name: "Linear", category: "Lighting", geometryKind }]))));
-  const controls = new AssetAssignmentControls(placed, () => controls.sync([row], () => true));
-  controls.sync([row], () => true);
-  await controls.open([row]);
-  expect(app.get("asset-source-up").disabled).toBe(geometryKind === "ifc");
-  expect(app.get("asset-source-up").value).toBe("y");
-  app.get("asset-source-up").value = "z";
-  const loader = vi.spyOn(libraryClient, "loadAssetGeometry").mockResolvedValue({ geometry: { meshes: [{ positions: [0,0,0, 4,0,0, 4,2,0, 0,2,0], normals: Array(12).fill(0), indices: [0,1,2,0,2,3], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] }, up: "y", kind: "ifc" });
-  app.get("asset-unit-scale").value = "1";
-  app.get("asset-assignment-apply").fire("click");
-  await vi.waitFor(() => expect(row.asset).toBeDefined());
-  expect(row.asset!.sourceUp).toBe("y");
-  expect(parent.children[0]!.rotation.x).toBe(0);
-  expect(parent.children[0]!.rotation.y).toBe(0);
-  expect(parent.children[0]!.rotation.z).toBeCloseTo(Math.PI / 3);
-  loader.mockRestore(); controls.dispose(); app.panel.dispose();
 });
 
 function assignedRows(app: ReturnType<typeof workspace>, count = 3): Segment[] {
@@ -691,7 +598,7 @@ function assignedRows(app: ReturnType<typeof workspace>, count = 3): Segment[] {
 
 it("shows asset child rows and keeps scan and asset master toggles before layer colors", () => {
   const app = workspace(), rows = assignedRows(app);
-  expect(app.named("Asset settings for Lighting 01: Linear-Light").textContent).toBe("Linear-Light");
+  expect(app.named("Asset name for Lighting 01").textContent).toBe("Linear-Light");
   const tools = app.get("segment-colors").parent!.parent!;
   expect(tools.children.indexOf(app.get("segment-scan-visible").parent!)).toBeLessThan(tools.children.indexOf(app.get("segment-colors").parent!));
   expect(tools.children.indexOf(app.get("segment-assets-visible").parent!)).toBeLessThan(tools.children.indexOf(app.get("segment-colors").parent!));
@@ -726,23 +633,11 @@ it("selects all assets, opens one asset settings scope and deletes assignments o
   expect(rows.every(row => !row.asset)).toBe(true);
   expect(app.named("Mesh name Lighting 01").value).toBe("Lighting 01");
   rows[0]!.asset = { id: "lamp", name: "Linear-Light", correctionZ: 0, scale: 1 };
-  app.panel.assetsChanged(); app.named("Asset settings for Lighting 01: Linear-Light").fire("click");
+  app.panel.assetsChanged(); app.named("Assign asset to element Lighting 01").fire("click");
   expect(app.assignAssets.mock.lastCall![0]).toEqual([rows[0]]);
   app.panel.dispose();
 });
 
-it("asset settings apply custom colors and remove only assignments", async () => {
-  const app = workspace(), placed = new PlacedAssets(new Group(), []);
-  const row: Segment = { id: 1, name: "Light", visible: true, layerId: 5, indices: new Uint32Array([0]), pose: { position: [0,0,0], z: 0, rotationReliable: true }, asset: { id: "lamp", name: "Lamp", correctionZ: 0, scale: 1 } };
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]")));
-  const changed = vi.fn(); const controls = new AssetAssignmentControls(placed, changed);
-  controls.sync([row], () => true); await controls.open([row]);
-  app.get("asset-settings-color").value = "#00ff00"; app.get("asset-apply-color").fire("click");
-  expect(row.asset!.color).toBe("#00ff00"); expect(changed).toHaveBeenCalledWith("custom");
-  app.get("asset-remove-assignment").fire("click");
-  expect(row.asset).toBeUndefined(); expect(row.indices).toEqual(new Uint32Array([0])); expect(row.layerId).toBe(5);
-  controls.dispose(); app.panel.dispose();
-});
 
 it("preserves selection when isolation temporarily synchronizes scan visibility", () => {
   const app = workspace(); assignedRows(app);
@@ -754,5 +649,38 @@ it("preserves selection when isolation temporarily synchronizes scan visibility"
   expect(app.get("segment-asset-selection-count").textContent).toContain("1 asset");
   app.panel.setScanVisibility(false);
   expect(app.clear).toHaveBeenCalledOnce();
+  app.panel.dispose();
+});
+
+it("orders layer controls and separates their scan and asset colors/visibility", () => {
+  const app = workspace(), rows = assignedRows(app);
+  const name = app.named("Layer name Lighting"), heading = name.parent!;
+  const ordered = [name, app.named("Set active layer Lighting"), app.named("Show scans in layer Lighting").parent!, app.named("Scan color of layer Lighting"), app.named("Show assets in layer Lighting").parent!, app.named("Asset color of layer Lighting"), app.named("Assign asset to layer Lighting")];
+  expect(heading.children.slice(-7)).toEqual(ordered);
+  app.named("Show scans in layer Lighting").checked = false;
+  app.named("Show scans in layer Lighting").fire("change");
+  expect([...app.panel.visibility()!]).toEqual([0,0,0]);
+  let call = app.syncAssets.mock.lastCall!;
+  expect(rows.every(row => call[1](row))).toBe(true);
+  app.named("Show assets in layer Lighting").checked = false;
+  app.named("Show assets in layer Lighting").fire("change");
+  call = app.syncAssets.mock.lastCall!;
+  expect(rows.every(row => !call[1](row))).toBe(true);
+  expect(rows.every(row => row.visible && row.asset!.visible !== false)).toBe(true);
+  app.named("Asset color of layer Lighting").value = "#ff0000";
+  app.named("Asset color of layer Lighting").fire("input");
+  expect(app.get("segment-asset-colors").value).toBe("layer");
+  expect([...app.syncAssets.mock.lastCall![2].layerColors.values()]).toEqual(["#ff0000"]);
+  app.named("Scan color of layer Lighting").value = "#00ff00";
+  app.named("Scan color of layer Lighting").fire("input");
+  expect(app.get("segment-colors").checked).toBe(true);
+  expect(app.named("Asset color of layer Lighting").value).toBe("#ff0000");
+  const child = app.named("Select asset for Lighting 01");
+  expect(child.querySelectorAll("button")).toHaveLength(0);
+  expect(child.querySelectorAll("input")).toHaveLength(1);
+  expect(() => app.named("Color asset for Lighting 01")).toThrow();
+  app.assignAssets.mockClear();
+  app.named("Asset name for Lighting 01").fire("click");
+  expect(app.assignAssets).not.toHaveBeenCalled();
   app.panel.dispose();
 });
