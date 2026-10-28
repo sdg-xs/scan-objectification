@@ -1,6 +1,7 @@
 import { parseLightResult, parseSamStatus } from "./light-detection-model";
 import type { LightDetection } from "./light-detection-model";
 import type { ScreenMask } from "./asset-selection-model";
+import { decodeSelectionMask } from "./selection-mask";
 
 function element<T extends HTMLElement>(id: string, type: { new (): T }): T {
   const value = document.getElementById(id);
@@ -161,7 +162,7 @@ export class LightDetectionControls {
         this.matches.append(label);
       });
       this.progress.textContent = detections.length
-        ? "Check matches to segment and select. Then choose Target Layer at the bottom of Model Browser and Classify."
+        ? "Check matches to segment and select. Then choose a layer in the Target Layer window and Classify."
         : "No matches. Try a closer view or a shorter visual description.";
       this.status.textContent = `${detections.length} matches for “${prompt}”.`;
     } catch (error) {
@@ -191,25 +192,15 @@ export class LightDetectionControls {
       for (const checkbox of this.matches.querySelectorAll<HTMLInputElement>("input:checked")) {
         const mask = result.detections[Number(checkbox.value)]?.mask_png;
         if (!mask) continue;
-        const image = new Image();
-        image.src = `data:image/png;base64,${mask}`;
-        await image.decode();
+        const maskPixels = await decodeSelectionMask(mask, result);
         if (request.signal.aborted) return;
-        if (image.naturalWidth !== result.width || image.naturalHeight !== result.height) throw new Error("The selection mask does not match this view.");
-        const canvas = document.createElement("canvas");
-        canvas.width = result.width;
-        canvas.height = result.height;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("The browser could not read the selection mask.");
-        context.drawImage(image, 0, 0);
-        const rgba = context.getImageData(0, 0, result.width, result.height).data;
-        for (let i = 0; i < pixels.length; i++) if (rgba[i * 4]! > 127) pixels[i] = Number(checkbox.value) + 1;
+        for (let i = 0; i < pixels.length; i++) if (maskPixels[i]) pixels[i] = Number(checkbox.value) + 1;
       }
       if (request.signal.aborted) return;
       const projectionStarted = performance.now();
       await result.select({ width: result.width, height: result.height, pixels }, result.prompt, request.signal);
       if (request.signal.aborted) return;
-      this.status.textContent = `Segmentation projected in ${((performance.now() - projectionStarted) / 1000).toFixed(1)}s. Choose Target Layer in Model Browser, then Classify.`;
+      this.status.textContent = `Segmentation projected in ${((performance.now() - projectionStarted) / 1000).toFixed(1)}s. Choose a target layer, then Classify.`;
       this.dialog.close();
     } catch (error) {
       if (!request.signal.aborted) this.report(error);

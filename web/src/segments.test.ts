@@ -266,6 +266,17 @@ it("opens the bottom target picker and reflects its choice in the layer and pare
   app.panel.dispose();
 });
 
+it("keeps target controls outside Model Browser and reveals it when a target is chosen", () => {
+  const app = workspace();
+  expect(app.get("segments-panel").contains(app.get("segment-target-picker"))).toBe(false);
+  app.create("layer", "Lighting");
+  app.get("segments-panel").open = false;
+  app.get("segment-target").fire("click");
+  app.named("Use target layer Lighting", "segment-target-options").fire("click");
+  expect(app.get("segments-panel").open).toBe(true);
+  app.panel.dispose();
+});
+
 it("dismisses target choices on Escape and outside click", () => {
   const app = workspace();
   app.create("layer", "Lighting");

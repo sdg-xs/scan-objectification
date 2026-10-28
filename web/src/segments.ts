@@ -194,6 +194,7 @@ export class SegmentPanel {
     const layer = this.model.layers.find(layer => layer.id === id);
     if (!layer) return;
     this.model.targetLayerId = id;
+    document.querySelector<HTMLDetailsElement>("#segments-panel")!.open = true;
     this.filter = "";
     document.querySelector<HTMLInputElement>("#segment-filter")!.value = "";
     this.expanded.set("root", true);

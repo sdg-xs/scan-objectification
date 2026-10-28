@@ -1,5 +1,15 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Selection-mask decoder and independent Target Layer window — 2026-10-28
+
+User reported “The selection mask does not match this view.” That message came from comparing HTMLImageElement.naturalWidth/naturalHeight against the capture during mask application. The API already validates each PNG's IHDR dimensions against the capture. Reproduced the rejection in a controller test where HTML image intrinsic dimensions differ from a valid 2×1 PNG; this is a synthetic reproduction, not proof of the exact cause in the denied user browser. New `selection-mask.ts` validates the PNG header/frame, decodes directly with createImageBitmap (no orientation/color conversion/premultiplication), checks bitmap pixel dimensions, reads an unscaled canvas mask and always closes the bitmap. Genuine mismatches still reject with actual/expected dimensions; no stretching fallback was added. Instance labels and stale/abort guards remain unchanged.
+
+User also requested Target Layer as an independent window at bottom middle. Moved Target Layer/Classify/Unclassify outside Model Browser into a bottom-center floating panel. On compact viewports it docks right, section/Fit controls stack above, and the browser ends above that control area; a minimum viewport height keeps controls reachable. The picker still uses its measured top-layer drop-up. Choosing a target also opens a collapsed Model Browser so active layer/group highlighting is visible. Model and naming behavior are unchanged.
+
+RED captured for the mask projection rejection and old picker containment. Focused tests now cover raw pixel projection, genuine PNG/frame mismatch, decoded mismatch, bitmap cleanup and independent picker/reveal behavior. Independent review found no confirmed important issues and explicitly notes the actual browser cause remains unproven. User must reload and run a fresh Capture & detect to verify their real scene; browser visual inspection remains restricted. Unrelated build-check.log preserved.
+
+Full gate passed: 71 backend tests, 75 frontend tests, typecheck and production build, with existing optional WebGPU/bundle warnings. The running API serves the independent Target Layer markup with HTTP 200. No GPU/worker inference changes were required.
+
 ## Target Layer, named classification and direct startup — 2026-10-28
 
 Resumed the pending bottom Target Layer UI. A small `TargetLayerPicker` module presents grouped layer choices upward in a native top-layer popover, with keyboard navigation, outside-click/scroll dismissal, Escape/Tab and resize handling. Its viewport-measured position/height avoids clipping by the full-height panel. Active choice synchronizes with inline layer markers, reveals the layer and highlights its parent group. Container selection for Delete remains separate.

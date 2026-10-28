@@ -3,6 +3,12 @@ import { LightDetectionControls } from "./light-detection";
 
 // Small DOM boundary fixture: exercise the real controller without a browser dependency.
 class Control extends EventTarget {
+  children: Control[] = [];
+  checked = false;
+  type = "";
+  width = 0;
+  height = 0;
+  constructor(readonly tag = "div") { super(); }
   textContent = "";
   value = "ceiling light";
   disabled = false;
@@ -13,11 +19,19 @@ class Control extends EventTarget {
   showModal = vi.fn(() => { this.open = true; });
   close(): void { this.open = false; this.dispatchEvent(new Event("close")); }
   focus(): void { this.focused = true; }
-  replaceChildren(): void {}
+  replaceChildren(): void { this.children = []; }
   removeAttribute(): void {}
-  append(): void {}
-  querySelectorAll(): Control[] { return []; }
-  querySelector(): null { return null; }
+  append(...children: (Control | string)[]): void { this.children.push(...children.filter((child): child is Control => child instanceof Control)); }
+  querySelectorAll(selector: string): Control[] {
+    return this.children.flatMap(child => [
+      ...(child.tag === "input" && (selector !== "input:checked" || child.checked) ? [child] : []),
+      ...child.querySelectorAll(selector),
+    ]);
+  }
+  querySelector(selector: string): Control | null { return this.querySelectorAll(selector)[0] ?? null; }
+  getContext(): { drawImage: () => void; getImageData: () => { data: Uint8ClampedArray } } {
+    return { drawImage: () => {}, getImageData: () => ({ data: new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255]) }) };
+  }
 }
 
 function workspace() {
@@ -29,7 +43,7 @@ function workspace() {
   };
   for (const name of ["HTMLButtonElement", "HTMLParagraphElement", "HTMLDialogElement", "HTMLImageElement", "HTMLUListElement", "HTMLDivElement", "HTMLInputElement", "HTMLFormElement"])
     vi.stubGlobal(name, Control);
-  vi.stubGlobal("document", { getElementById: get, createElement: () => new Control() });
+  vi.stubGlobal("document", { getElementById: get, createElement: (tag: string) => new Control(tag) });
   vi.stubGlobal("window", { setTimeout, clearTimeout });
   const capture = vi.fn(() => ({
     canvas: { width: 1, height: 1, toBlob: (callback: BlobCallback) => callback(new Blob(["frame"])) },
@@ -102,5 +116,32 @@ it("leaves the view live when context is empty", () => {
   expect(app.capture).not.toHaveBeenCalled();
   expect(app.pause).not.toHaveBeenCalled();
   expect(app.get("sam-prompt").focused).toBe(true);
+  app.controller.dispose();
+});
+
+it("projects actual PNG pixels even when image-element intrinsic dimensions differ", async () => {
+  const app = workspace();
+  const select = vi.fn(async () => {});
+  const close = vi.fn();
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAAAAADRSSBWAAAAC0lEQVR4nGP4zwAAAgEBADK6K5IAAAAASUVORK5CYII=";
+  app.capture.mockReturnValue({ canvas: { width: 2, height: 1, toBlob: callback => callback(new Blob(["frame"])) }, select });
+  vi.stubGlobal("Image", class {
+    naturalWidth = 1;
+    naturalHeight = 1;
+    decode = async () => {};
+  });
+  vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 2, height: 1, close })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith("sam-status")
+    ? { model: "sam3.1", status: "ready", phase: "idle", busy: false, model_loaded: true }
+    : { model: "sam3.1", width: 2, height: 1, prompt: "ceiling light", overlay_png: png,
+      groups: [{ kind: "custom", detections: [{ score: 0.9, box: [0, 0, 1, 1], mask_png: png }] }] } })));
+  app.submit();
+  await vi.waitFor(() => expect(app.get("sam-select").disabled).toBe(false));
+  app.get("sam-select").dispatchEvent(new Event("click"));
+  await vi.waitFor(() => expect(select).toHaveBeenCalledWith(
+    { width: 2, height: 1, pixels: new Uint8Array([1, 0]) }, "ceiling light", expect.any(AbortSignal),
+  ));
+  expect(close).toHaveBeenCalledOnce();
+  expect(app.pause).toHaveBeenLastCalledWith(false);
   app.controller.dispose();
 });
