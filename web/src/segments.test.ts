@@ -498,3 +498,67 @@ it("Shift range selection skips elements inside collapsed layers", () => {
   expect(app.named("Select mesh A 01").getAttribute("data-selected")).toBe("false");
   app.panel.dispose();
 });
+
+it("removes selected element records after confirmation while preserving the source scan", async () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 3 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2, 3]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  app.named("Select mesh Lighting 01").fire("click");
+  app.named("Select mesh Lighting 03").fire("click", undefined, { ctrlKey: true });
+  expect(app.get("segment-delete").disabled).toBe(false);
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-title").textContent).toContain("2 elements");
+  expect(app.get("segment-delete-description").textContent).toContain("geometry is preserved");
+  expect(app.get("segment-delete-assignment").hidden).toBe(true);
+  app.get("segment-delete-cancel").fire("click");
+  await Promise.resolve();
+  expect(app.named("Mesh name Lighting 01").value).toBe("Lighting 01");
+  app.get("segment-delete").fire("click");
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Mesh name Lighting 01")).toThrow();
+  expect(() => app.named("Mesh name Lighting 03")).toThrow();
+  expect(app.named("Mesh name Lighting 02").value).toBe("Lighting 02");
+  expect(app.named("Layer name Lighting").value).toBe("Lighting");
+  app.named("Layer name Lighting").focus();
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-assignment").hidden).toBe(false);
+  app.get("segment-delete-cancel").fire("click");
+  expect(app.panel.visibility()).toBeUndefined();
+  // Source indices remain available for subsequent detection.
+  app.panel.add(new Uint8Array([1, 0, 1]), "detected again");
+  expect(app.named("Mesh name detected again 1").value).toBe("detected again 1");
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});
+
+it("removes Unclassified records and cancels pending element deletion on new SAM results", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 0]), "old");
+  app.get("segment-delete").fire("click");
+  expect(app.get("segment-delete-dialog").open).toBe(true);
+  app.panel.add(new Uint8Array([0, 1]), "new");
+  expect(app.get("segment-delete-dialog").open).toBe(false);
+  app.get("segment-delete-form").fire("submit");
+  expect(app.named("Mesh name old 1").value).toBe("old 1");
+  app.get("segment-delete").fire("click");
+  app.get("segment-delete-form").fire("submit");
+  expect(() => app.named("Mesh name new 1")).toThrow();
+  expect(app.named("Mesh name old 1").value).toBe("old 1");
+  app.panel.dispose();
+});
+
+it("discards pending element deletion when the source is replaced", () => {
+  const app = workspace();
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1]), "old");
+  app.get("segment-delete").fire("click");
+  app.panel.setScan({ numSplats: 1 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.get("segment-delete-form").fire("submit");
+  expect(app.get("segment-delete-dialog").open).toBe(false);
+  expect(app.errors).not.toHaveBeenCalled();
+  app.panel.dispose();
+});

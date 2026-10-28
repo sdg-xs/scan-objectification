@@ -19,7 +19,7 @@ export class SegmentPanel {
   private readonly nameDialog = document.querySelector<HTMLDialogElement>("#segment-name-dialog")!;
   private pendingClassification: { ids: number[]; layerId: number } | undefined;
   private container: { kind: "group" | "layer"; id: number } | undefined;
-  private deleting: { kind: "group" | "layer"; id: number } | undefined;
+  private deleting: { kind: "group" | "layer"; id: number } | { kind: "elements"; ids: number[] } | undefined;
   private readonly events = new AbortController();
   private readonly selected = new Set<number>();
   private selectionAnchor: number | undefined;
@@ -38,7 +38,7 @@ export class SegmentPanel {
       ["segment-clear-highlight", "clear", "Clear selection"],
       ["segment-add-group", "group", "Add Group"],
       ["segment-add-layer", "layer", "Add Layer"],
-      ["segment-delete", "remove", "Delete selected group or layer"],
+      ["segment-delete", "remove", "Delete selected elements, group or layer"],
     ] as const) classificationButton(document.querySelector<HTMLButtonElement>(`#${id}`)!, icon, label);
     for (const [id, text] of [["segment-classify", "Classify"], ["segment-move", "Move"], ["segment-unclassify", "Unclassify"]] as const) {
       const label = document.createElement("span");
@@ -73,7 +73,10 @@ export class SegmentPanel {
       if (!this.deleting) return;
       const destination = document.querySelector<HTMLSelectElement>("#segment-delete-destination")!.value;
       try {
-        this.model.deleteContainer(this.deleting.kind, this.deleting.id, destination ? Number(destination) : null);
+        if (this.deleting.kind === "elements") {
+          for (const id of this.deleting.ids) this.model.remove(id);
+        } else this.model.deleteContainer(this.deleting.kind, this.deleting.id, destination ? Number(destination) : null);
+        this.deleting = undefined;
         this.container = undefined;
         this.deleteDialog.close();
         this.changed();
@@ -161,6 +164,7 @@ export class SegmentPanel {
 
   setScan(mesh: SplatMesh | undefined): void {
     const preserveHierarchy = !this.mesh && Boolean(mesh);
+    this.deleting = undefined;
     this.createDialog.close();
     this.deleteDialog.close();
     this.nameDialog.close();
@@ -184,6 +188,9 @@ export class SegmentPanel {
   }
 
   add(labels: Uint8Array, prompt: string): void {
+    this.deleting = undefined;
+    this.deleteDialog.close();
+    this.container = undefined;
     this.createDialog.close();
     this.nameDialog.close();
     this.pendingClassification = undefined;
@@ -231,6 +238,7 @@ export class SegmentPanel {
       } else { this.selected.clear(); this.selected.add(id); }
       this.selectionAnchor = id;
     }
+    this.container = undefined;
     this.highlight();
     this.markSelection();
   }
@@ -243,6 +251,7 @@ export class SegmentPanel {
   }
 
   private markSelection(): void {
+    this.markContainer();
     for (const row of this.list.querySelectorAll<HTMLElement>("[data-object-id]")) {
       const selected = this.selected.has(Number(row.dataset.objectId));
       row.setAttribute("data-selected", String(selected));
@@ -343,15 +352,25 @@ export class SegmentPanel {
     for (const heading of this.list.querySelectorAll<HTMLElement>("[data-container]"))
       heading.classList.toggle("segment-container-selected", heading.dataset.container === key);
     const button = document.querySelector<HTMLButtonElement>("#segment-delete")!;
-    button.disabled = !this.container;
+    button.disabled = !this.container && !this.selected.size;
     const item = this.container && (this.container.kind === "group" ? this.model.groups : this.model.layers).find(item => item.id === this.container?.id);
-    button.title = item ? `Delete ${this.container!.kind} ${item.name}` : "Select a group or layer to delete";
+    button.title = item ? `Delete ${this.container!.kind} ${item.name}` : this.selected.size ? `Remove ${this.selected.size} selected elements from the list; preserve geometry` : "Select elements, a group or a layer to delete";
     button.setAttribute("aria-label", button.title);
   }
 
   private confirmDelete(): void {
     const container = this.container;
-    if (!container) return;
+    const assignment = document.querySelector<HTMLElement>("#segment-delete-assignment")!;
+    assignment.hidden = !container;
+    if (!container) {
+      if (!this.selected.size) return;
+      this.deleting = { kind: "elements", ids: [...this.selected] };
+      document.querySelector("#segment-delete-title")!.textContent = `Remove ${this.selected.size} elements from the list?`;
+      document.querySelector("#segment-delete-description")!.textContent = "Only element records and their classification are removed. The scan geometry is preserved and returns to the unsegmented context, following Unclassified visibility.";
+      this.deleteDialog.showModal();
+      document.querySelector<HTMLButtonElement>("#segment-delete-confirm")!.focus();
+      return;
+    }
     const item = (container.kind === "group" ? this.model.groups : this.model.layers).find(item => item.id === container.id);
     if (!item) return;
     const layers = this.model.layers.filter(layer => container.kind === "group" ? layer.groupId === container.id : layer.id === container.id);
@@ -554,7 +573,6 @@ export class SegmentPanel {
       if (group.name.toLocaleLowerCase().includes(this.filter) || this.model.layers.some(layer => layer.groupId === group.id && this.matchesLayer(layer))) classified.element.append(this.group(group));
     for (const layer of this.model.layers) if (layer.groupId === null && this.matchesLayer(layer)) classified.element.append(this.layer(layer));
     this.list.append(unclassified.element, classified.element);
-    this.markContainer();
     this.markSelection();
   }
 

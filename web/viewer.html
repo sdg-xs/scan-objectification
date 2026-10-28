@@ -193,10 +193,12 @@
               <form id="segment-delete-form">
                 <h3 id="segment-delete-title">Delete group or layer</h3>
                 <p id="segment-delete-description"></p>
-                <label for="segment-delete-destination">Preserve contained elements by</label>
-                <select id="segment-delete-destination"><option value="">Unassigning to Unclassified</option></select>
+                <div id="segment-delete-assignment">
+                  <label for="segment-delete-destination">Preserve contained elements by</label>
+                  <select id="segment-delete-destination"><option value="">Unassigning to Unclassified</option></select>
+                </div>
                 <div class="segment-delete-actions">
-                  <button type="submit">Delete</button>
+                  <button id="segment-delete-confirm" type="submit">Delete</button>
                   <button id="segment-delete-cancel" type="button">Cancel</button>
                 </div>
               </form>
