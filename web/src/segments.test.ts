@@ -1,3 +1,7 @@
+import { Group } from "three";
+import { AssetAssignmentControls } from "./asset-assignment";
+import { PlacedAssets } from "./placed-assets";
+import type { Segment } from "./segments-model";
 import { readFileSync } from "node:fs";
 import { afterEach, expect, it, vi } from "vitest";
 import { SegmentPanel } from "./segments";
@@ -119,7 +123,8 @@ function workspace() {
     constructor(text: string, value: string) { super("option"); this.textContent = text; this.value = value; }
   });
   const errors = vi.fn();
-  const panel = new SegmentPanel({ select: vi.fn(), clear: vi.fn(), error: errors });
+  const assignAssets = vi.fn();
+  const panel = new SegmentPanel({ select: vi.fn(), clear: vi.fn(), error: errors, assignAssets });
   const descendants = (node: Control): Control[] => node.children.flatMap(child => [child, ...descendants(child)]);
   const named = (label: string, root = "segment-list"): Control => {
     const item = descendants(get(root)).find(item => item.attributes.get("aria-label") === label);
@@ -131,7 +136,7 @@ function workspace() {
     get(`segment-${kind}-name`).value = name;
     get(`segment-${kind}-form`).fire("submit");
   };
-  return { get, panel, named, create, errors, documentNode };
+  return { get, panel, named, create, errors, documentNode, assignAssets };
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -561,4 +566,90 @@ it("discards pending element deletion when the source is replaced", () => {
   expect(app.get("segment-delete-dialog").open).toBe(false);
   expect(app.errors).not.toHaveBeenCalled();
   app.panel.dispose();
+});
+
+it("assigns at element and layer scope with icons before each eye", () => {
+  const app = workspace();
+  app.create("layer", "Lighting");
+  app.panel.setScan({ numSplats: 2 } as Parameters<SegmentPanel["setScan"]>[0]);
+  app.panel.add(new Uint8Array([1, 2]), "light");
+  app.get("segment-classify").fire("click");
+  app.get("segment-name-form").fire("submit");
+  const button = app.named("Assign asset to element Lighting 01");
+  expect(button.parent?.children.at(-2)).toBe(button);
+  button.fire("click");
+  expect(app.assignAssets.mock.lastCall?.[0].map((row: { name: string }) => row.name)).toEqual(["Lighting 01"]);
+  const layer = app.named("Assign asset to layer Lighting");
+  expect(layer.parent?.children.at(-2)).toBe(layer);
+  layer.fire("click");
+  expect(app.assignAssets.mock.lastCall?.[0]).toHaveLength(2);
+  app.panel.dispose();
+});
+
+it("assigns one library geometry to every scoped element and corrects only the requested occurrence", async () => {
+  const app = workspace();
+  const parent = new Group(), placed = new PlacedAssets(parent, []);
+  const geometry = { meshes: [{ positions: [0,0,0, 2,0,0, 2,1,0], normals: [0,0,1, 0,0,1, 0,0,1], indices: [0,1,2], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] };
+  vi.stubGlobal("fetch", vi.fn(async (path: string) => new Response(JSON.stringify(path.endsWith("/geometry") ? { kind: "mesh", geometry } : [{ id: "asset-a", name: "Linear light", category: "Lighting" }]))));
+  const rows: Segment[] = [1,2].map(id => ({ id, name: `Light ${id}`, layerId: 9, indices: new Uint32Array([id]), visible: true,
+    pose: { position: [id, 2, 3], z: Math.PI / 4, rotationReliable: true } }));
+  const controls = new AssetAssignmentControls(placed, () => controls.sync(rows, () => true));
+  controls.sync(rows, () => true);
+  await controls.open(rows);
+  app.get("asset-source-up").value = "z";
+  app.get("asset-unit-scale").value = "1";
+  app.get("asset-assignment-apply").fire("click");
+  await vi.waitFor(() => expect(parent.children).toHaveLength(2));
+  expect(rows.map(row => row.asset?.id)).toEqual(["asset-a", "asset-a"]);
+  expect(parent.children[0]!.position.toArray()).toEqual([1,2,3]);
+  app.get("asset-assignment-apply").fire("click");
+  await vi.waitFor(() => expect(app.get("asset-assignment-apply").disabled).toBe(false));
+  expect(parent.children).toHaveLength(2);
+  await controls.open(rows.slice(0,1));
+  app.get("asset-rotation-correction").value = "30";
+  app.get("asset-correct-rotation").fire("click");
+  expect(rows[0]!.asset!.correctionZ).toBeCloseTo(Math.PI / 6);
+  expect(rows[1]!.asset!.correctionZ).toBe(0);
+  expect(rows[0]!.pose!.z).toBeCloseTo(Math.PI / 4);
+  controls.dispose(); app.panel.dispose();
+});
+
+it("keeps existing assignments on geometry failure and rejects stale element loads", async () => {
+  const app = workspace(), placed = new PlacedAssets(new Group(), []);
+  const rows: Segment[] = [{ id: 1, name: "Light", layerId: null, indices: new Uint32Array([0]), visible: true,
+    pose: { position: [0,0,0], z: 0, rotationReliable: false }, asset: { id: "old", name: "Original", correctionZ: 0, scale: 1 } }];
+  const controls = new AssetAssignmentControls(placed, () => {});
+  controls.sync(rows, () => true);
+  vi.stubGlobal("fetch", vi.fn(async (path: string) => path.endsWith("/geometry") ? new Response(JSON.stringify({ detail: "Missing geometry" }), { status: 404 }) : new Response(JSON.stringify([{ id: "new", name: "New", category: "Lighting" }]))));
+  await controls.open(rows);
+  app.get("asset-unit-scale").value = "1";
+  app.get("asset-assignment-apply").fire("click");
+  await vi.waitFor(() => expect(app.get("asset-assignment-status").textContent).toContain("Missing geometry"));
+  expect(rows[0]!.asset!.id).toBe("old");
+  rows[0]!.indices = new Uint32Array([1]);
+  controls.sync(rows, () => true);
+  expect(app.get("asset-assignment-dialog").open).toBe(false);
+  controls.dispose(); app.panel.dispose();
+});
+
+it("discards a geometry response arriving after its source scope is cleared", async () => {
+  const app = workspace(), parent = new Group(), placed = new PlacedAssets(parent, []);
+  const rows: Segment[] = [{ id: 1, name: "Light", layerId: null, indices: new Uint32Array([0]), visible: true,
+    pose: { position: [0,0,0], z: 0, rotationReliable: false } }];
+  let respond: ((response: Response) => void) | undefined;
+  vi.stubGlobal("fetch", vi.fn(async (path: string) => path.endsWith("/geometry")
+    ? await new Promise<Response>(resolve => { respond = resolve; })
+    : new Response(JSON.stringify([{ id: "new", name: "New", category: "Lighting" }]))));
+  const controls = new AssetAssignmentControls(placed, () => {});
+  controls.sync(rows, () => true);
+  await controls.open(rows);
+  app.get("asset-unit-scale").value = "1";
+  app.get("asset-assignment-apply").fire("click");
+  await vi.waitFor(() => expect(respond).toBeDefined());
+  controls.reset();
+  respond!(new Response(JSON.stringify({ kind: "mesh", geometry: { meshes: [{ positions: [0,0,0,1,0,0,0,1,0], normals: [0,0,1,0,0,1,0,0,1], indices: [0,1,2], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] } })));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(rows[0]!.asset).toBeUndefined();
+  expect(parent.children).toHaveLength(0);
+  controls.dispose(); app.panel.dispose();
 });

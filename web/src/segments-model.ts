@@ -1,9 +1,13 @@
+import type { ElementPose } from "./element-pose";
+
 export interface Segment {
   id: number;
   name: string;
   layerId: number | null;
   visible: boolean;
   indices: Uint32Array;
+  pose?: ElementPose;
+  asset?: { id: string; name: string; correctionZ: number; scale: number; sourceUp?: "y" | "z" };
 }
 export interface SegmentGroup { id: number; name: string; visible: boolean }
 export interface SegmentLayer { id: number; name: string; groupId: number | null; visible: boolean; color: string; nextElementNumber: number }

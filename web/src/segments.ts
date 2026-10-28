@@ -1,3 +1,4 @@
+import { estimateElementPose } from "./element-pose";
 import { dyno, readRgbaArray, SplatMesh } from "@sparkjsdev/spark";
 import type { GsplatModifier, RgbaArray } from "@sparkjsdev/spark";
 import { createSelectionTexture } from "./asset-selection";
@@ -29,7 +30,7 @@ export class SegmentPanel {
   private rgba: RgbaArray | undefined;
   private modifier: GsplatModifier | undefined;
 
-  constructor(private readonly actions: { select: (indices: Uint32Array) => void; clear: () => void; error: (error: unknown) => void }) {
+  constructor(private readonly actions: { select: (indices: Uint32Array) => void; clear: () => void; error: (error: unknown) => void; assignAssets?: (elements: readonly Segment[]) => void; syncAssets?: (elements: readonly Segment[], visible: (segment: Segment) => boolean) => void; resetAssets?: () => void }) {
     const signal = this.events.signal;
     for (const [id, icon, label] of [
       ["segment-classify", "classify", "Classify selected objects into the Target Layer"],
@@ -163,6 +164,7 @@ export class SegmentPanel {
   }
 
   setScan(mesh: SplatMesh | undefined): void {
+    this.actions.resetAssets?.();
     const preserveHierarchy = !this.mesh && Boolean(mesh);
     this.deleting = undefined;
     this.createDialog.close();
@@ -206,6 +208,7 @@ export class SegmentPanel {
     for (const segment of this.model.segments)
       if (!previous.has(segment.id) && this.model.isVisible(segment)) this.selected.add(segment.id);
     this.selectionAnchor = [...this.selected][0];
+    this.recordPoses();
     this.paint();
     this.highlight();
     this.render();
@@ -213,6 +216,17 @@ export class SegmentPanel {
       : !this.model.unclassifiedVisible ? `${added} objects added. Turn on Unclassified to select and review them.`
       : `${added} SAM objects selected in Unclassified.`;
   }
+
+  recordPoses(): void {
+    const mesh = this.mesh;
+    if (!mesh?.extSplats) return;
+    mesh.updateMatrix();
+    for (const segment of this.model.segments)
+      segment.pose = estimateElementPose(segment.indices.length, i => mesh.extSplats!.getSplat(segment.indices[i]!).center.applyMatrix4(mesh.matrix));
+    this.assetsChanged();
+  }
+
+  assetsChanged(): void { this.paint(); this.render(); }
 
   clearSelection(): void { this.selected.clear(); this.selectionAnchor = undefined; this.actions.clear(); this.render(); }
 
@@ -398,6 +412,13 @@ export class SegmentPanel {
     this.actions.select(indices);
   }
 
+  private assignButton(elements: () => readonly Segment[], label: string): HTMLButtonElement {
+    const button = this.button("assignAsset", label, () => this.actions.assignAssets?.(elements()));
+    button.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); });
+    button.disabled = !elements().length;
+    return button;
+  }
+
   private button(icon: ClassificationIcon, label: string, action: () => void): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
@@ -482,7 +503,8 @@ export class SegmentPanel {
     const visibility = this.eye(`mesh ${segment.name}`, segment.visible, visible => this.model.update(segment.id, { visible }));
     visibility.addEventListener("click", event => event.stopPropagation());
     row.append(icon,
-      this.name(segment.name, `Mesh name ${segment.name}`, name => this.model.update(segment.id, { name }), 120), visibility);
+      this.name(segment.name, `Mesh name ${segment.name}`, name => this.model.update(segment.id, { name }), 120),
+      this.assignButton(() => [segment], `Assign asset to element ${segment.name}`), visibility);
     return row;
   }
 
@@ -506,7 +528,7 @@ export class SegmentPanel {
     color.addEventListener("input", () => { layer.color = color.value; this.paint(); });
     const target = this.button("activeLayer", `Set active layer ${layer.name}`, () => this.setActiveLayer(layer.id));
     target.setAttribute("aria-pressed", String(this.model.targetLayerId === layer.id));
-    row.replaceChildren(classificationIcon("layerItem"), name, color, target, this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }));
+    row.replaceChildren(classificationIcon("layerItem"), name, color, target, this.assignButton(() => this.model.segments.filter(segment => segment.layerId === layer.id), `Assign asset to layer ${layer.name}`), this.eye(`layer ${layer.name}`, layer.visible, visible => { layer.visible = visible; }));
     this.chooseContainer(row, "layer", layer.id);
     const group = document.createElement("select");
     group.className = "segment-layer-group";
@@ -577,6 +599,7 @@ export class SegmentPanel {
   }
 
   private paint(): void {
+    this.actions.syncAssets?.(this.model.segments, segment => this.model.isVisible(segment));
     if (!this.mesh) return;
     const visible = this.visibility();
     if (!visible && (!this.colors.checked || !this.model.segments.some(segment => segment.layerId !== null))) { this.release(); return; }

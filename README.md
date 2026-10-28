@@ -43,6 +43,26 @@ To remove element records, select rows with click/Ctrl/Shift, then use the toolb
 
 Rename layers and groups inline. Click or focus a group/layer row to select it, then use the toolbar Delete icon. Its confirmation offers to unassign contained objects to Unclassified or assign them to another surviving layer. Deleting a group also removes its layers; the dialog states this before confirmation. Cancel leaves everything unchanged. Each splat belongs to one object, and new segmentation takes ownership where results overlap. Records last for the loaded scan and follow alignment changes; reloading or replacing it clears them. Source files and Gaussian properties are unchanged. Saving/exporting classifications is future work. The previous manual asset controls are temporarily hidden; SAM occupies sidebar slot **02**.
 
+### Assign library assets to segmented elements
+
+After SAM adds elements, the viewer records each selection’s bounding center and dominant horizontal direction. Rotation is **Z only**, modulo 180°. Round/symmetric shapes have no reliable heading and are labelled uncertain. Coordinates are stored in the scan’s aligned local frame so asset occurrences follow later scan placement changes. Source-up changes recompute recorded poses. These records and assignments currently last for the loaded scan session.
+
+1. Click **Assign asset** (cube-plus icon immediately before the eye) on an element row or layer row. A layer targets all its current elements; an element targets only itself.
+2. Search the existing asset-library catalog by name/category and choose the reusable definition. Expand Recorded element poses to inspect coordinates and detected Z angles. Geometry is resolved on demand from saved mesh data or a representative IFC/source reference.
+3. Leave Asset up axis at Y for normal library/IFC geometry; choose Z for a Z-up uploaded mesh. Library IFC geometry is already in metres; use 1:1. For imported meshes authored in millimetres/centimetres, choose the matching unit scale. Geometry is centered and its dominant horizontal direction becomes the asset’s X direction; it is never stretched to the detection bounds.
+4. Choose **Assign asset**. Each target gets one occurrence at its own recorded pose. Assignment replaces its prior asset, preserves the original scan, and follows group/layer/element visibility and the section box.
+5. Reopen the element’s Assign asset window, enter **Z rotation correction**, and choose **Update existing asset rotation**. This changes only the asset offset, keeping the detected angle. At layer level, the correction applies to existing assigned assets throughout that layer. Use 180° to reverse a linear asset’s direction.
+
+The read-only gateway uses the existing local library service at `http://127.0.0.1:3001`; it does not modify its catalog. Start its production service with `node.exe dist-server/server/index.js` from the asset.library folder. The assignment window offers Reload library after a connection error. Definitions whose source geometry is unavailable report that error without replacing prior placements. Changing scan/source selection cancels stale loads. Removing an element record removes its assigned occurrence while retaining the original splats; deleting a group/layer preserves assignments on the moved/unclassified elements.
+
+Read-only integration smoke check, with both services running:
+
+```powershell
+node.exe scripts/verify-library-asset.mjs ASSET_ID
+```
+
+This checks the real geometry gateway, shared IFC extractor and normalized bounds without opening a browser. Automated checks do not establish visual placement accuracy in a user scene.
+
 The viewer adopts the local `asset.library` reference's Poppins fonts, navy header, white panels and blue controls, with a black 3D viewport. Fonts are bundled locally. Theme rules change colors and font families without changing layout dimensions.
 
 This organization follows ReCap concepts, using our own implementation. See the [installed ReCap investigation](docs/research/2026-10-27-recap-classification.md) for static REA evidence, Autodesk documentation and limits.

@@ -8,6 +8,8 @@ import wasmUrl from "web-ifc/web-ifc.wasm?url";
 import { SectionBox } from "./section-box";
 import { AssetSelection } from "./asset-selection";
 import { SegmentPanel } from "./segments";
+import { PlacedAssets } from "./placed-assets";
+import { AssetAssignmentControls } from "./asset-assignment";
 import { LightDetectionControls } from "./light-detection";
 import { captureSize } from "./light-detection-model";
 import {
@@ -137,7 +139,15 @@ async function start(): Promise<void> {
     },
   });
 
-  const segments = new SegmentPanel({ select: indices => selection.selectIndices(indices), clear: () => selection.clear(), error: showError });
+  const placedAssets = new PlacedAssets(scanGroup, section.planes);
+  let assetAssignment: AssetAssignmentControls | undefined;
+  const segments = new SegmentPanel({
+    select: indices => selection.selectIndices(indices), clear: () => selection.clear(), error: showError,
+    assignAssets: elements => { void assetAssignment?.open(elements).catch(showError); },
+    syncAssets: (elements, visible) => assetAssignment?.sync(elements, visible),
+    resetAssets: () => assetAssignment?.reset(),
+  });
+  assetAssignment = new AssetAssignmentControls(placedAssets, () => segments.assetsChanged());
 
   const lights = new LightDetectionControls(() => {
     if (!splats || !scanGroup.visible)
@@ -400,6 +410,7 @@ async function start(): Promise<void> {
   axis.addEventListener("change", () => {
     selection.clear();
     orientScan();
+    segments.recordPoses();
     frame(worldScanBounds());
   });
   window.addEventListener("keydown", (event) => {
@@ -451,6 +462,7 @@ async function start(): Promise<void> {
     observer.disconnect();
     renderer.setAnimationLoop(null);
     selection.dispose();
+    assetAssignment?.dispose();
     segments.dispose();
     lights.dispose();
     controls.dispose();

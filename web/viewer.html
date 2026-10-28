@@ -220,6 +220,29 @@
             <p class="segment-session-note" hidden>Temporary · stays with this loaded scan.</p>
           </div>
         </details>
+        <dialog id="asset-assignment-dialog" class="segment-dialog asset-assignment-dialog" aria-labelledby="asset-assignment-title">
+          <h3 id="asset-assignment-title">Assign asset</h3>
+          <p id="asset-assignment-scope"></p>
+          <p class="hint">Uses recorded center and estimated Z rotation. Original scan geometry stays in place. Placements last for this loaded scan.</p>
+          <details><summary>Recorded element poses</summary><div id="asset-pose-list" class="asset-pose-list"></div></details>
+          <label>Z rotation correction (degrees)<input id="asset-rotation-correction" type="number" min="-360" max="360" step="1" value="0" /></label>
+          <p class="hint">Added to each detected angle. Use 180° to reverse a linear asset’s direction.</p>
+          <button id="asset-correct-rotation" type="button">Update existing asset rotation</button>
+          <hr />
+          <label>Search library<input id="asset-library-filter" type="search" placeholder="Name or category" /></label>
+          <label>Category<select id="asset-library-category"><option value="">All categories</option></select></label>
+          <label>Asset<select id="asset-library-choice" size="7" aria-label="Choose library asset"></select></label>
+          <div class="asset-placement-options">
+            <label>Asset up axis<select id="asset-source-up"><option value="y">Y (library default)</option><option value="z">Z</option></select></label>
+            <label>Asset unit scale<select id="asset-unit-scale"><option value="1">1:1 (metres)</option><option value="0.001">Millimetres → metres</option><option value="0.01">Centimetres → metres</option></select></label>
+          </div>
+          <p id="asset-assignment-status" role="status"></p>
+          <div class="segment-delete-actions">
+            <button id="asset-assignment-apply" type="button" disabled>Assign asset</button>
+            <button id="asset-library-retry" type="button">Reload library</button>
+            <button id="asset-assignment-close" type="button">Close</button>
+          </div>
+        </dialog>
         <section id="target-layer-window" class="target-layer-window segment-classification-footer" aria-label="Target layer and classification">
           <div id="segment-target-picker" class="target-layer-picker">
             <span class="segment-target-caption">Target Layer</span>

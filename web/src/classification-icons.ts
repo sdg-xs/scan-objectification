@@ -1,4 +1,5 @@
 const paths = {
+  assignAsset: ["m3 8 7-4 7 4v9l-7 4-7-4V8Z M3 8l7 4 7-4M10 12v9", "M18 2v7m-3-3h6"],
   classify: ["M3 6 10 2l7 4-7 4-7-4Z M3 11l7 4 3-2 M3 16l7 4 3-2", "M15 17h7m-3-3 3 3-3 3"],
   unclassify: ["M3 6 10 2l7 4-7 4-7-4Z M3 11l7 4 3-2 M3 16l7 4 3-2", "M22 17h-7m3-3-3 3 3 3"],
   move: ["M3 5h7v7H3V5Z M14 12h7v7h-7", "M8 17h10m-4-4 4 4-4 4"],
