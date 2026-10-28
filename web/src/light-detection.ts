@@ -161,7 +161,7 @@ export class LightDetectionControls {
         this.matches.append(label);
       });
       this.progress.textContent = detections.length
-        ? "Check matches to segment and select. Objects stay in Unclassified; assigning them to the active layer will be added later."
+        ? "Check matches to segment and select. Then choose Target Layer at the bottom of Model Browser and Classify."
         : "No matches. Try a closer view or a shorter visual description.";
       this.status.textContent = `${detections.length} matches for “${prompt}”.`;
     } catch (error) {
@@ -209,7 +209,7 @@ export class LightDetectionControls {
       const projectionStarted = performance.now();
       await result.select({ width: result.width, height: result.height, pixels }, result.prompt, request.signal);
       if (request.signal.aborted) return;
-      this.status.textContent = `Segmentation projected in ${((performance.now() - projectionStarted) / 1000).toFixed(1)}s. Objects remain Unclassified.`;
+      this.status.textContent = `Segmentation projected in ${((performance.now() - projectionStarted) / 1000).toFixed(1)}s. Choose Target Layer in Model Browser, then Classify.`;
       this.dialog.close();
     } catch (error) {
       if (!request.signal.aborted) this.report(error);

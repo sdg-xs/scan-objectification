@@ -6,7 +6,7 @@ export interface Segment {
   indices: Uint32Array;
 }
 export interface SegmentGroup { id: number; name: string; visible: boolean }
-export interface SegmentLayer { id: number; name: string; groupId: number | null; visible: boolean; color: string }
+export interface SegmentLayer { id: number; name: string; groupId: number | null; visible: boolean; color: string; nextElementNumber: number }
 
 /** Session-only source IDs. A splat belongs to at most one segment. */
 export class SegmentCollection {
@@ -72,7 +72,7 @@ export class SegmentCollection {
     const existing = this.layers.find(layer => layer.groupId === groupId && layer.name.toLocaleLowerCase() === name.toLocaleLowerCase());
     if (existing) return existing;
     const palette = ["#69b8ee", "#b590e2", "#83c97d", "#e7bd68", "#e689a9"];
-    const layer = { id: this.nextId++, name, groupId, visible: true, color: palette[this.layers.length % palette.length]! };
+    const layer = { id: this.nextId++, name, groupId, visible: true, color: palette[this.layers.length % palette.length]!, nextElementNumber: 1 };
     this.layers.push(layer);
     return layer;
   }
@@ -81,6 +81,27 @@ export class SegmentCollection {
     if (!this.layers.some(layer => layer.id === this.targetLayerId)) throw new Error("Choose a target layer first.");
     const selected = new Set(ids);
     for (const segment of this.segments) if (selected.has(segment.id)) segment.layerId = this.targetLayerId;
+  }
+
+  classifyNamed(objects: readonly { id: number; name: string }[], layerId: number): void {
+    const layer = this.layers.find(layer => layer.id === layerId);
+    if (!layer) throw new Error("Choose an existing target layer.");
+    if (!objects.length) throw new Error("Select objects to classify.");
+    const prepared = objects.map(object => {
+      const segment = this.segments.find(item => item.id === object.id);
+      if (!segment) throw new Error("The selection changed. Select the objects again.");
+      const name = object.name.trim().slice(0, 120);
+      if (!name) throw new Error("Enter a name for each selected mesh.");
+      return { segment, name };
+    });
+    for (const { segment, name } of prepared) { segment.name = name; segment.layerId = layerId; }
+    layer.nextElementNumber += prepared.length;
+  }
+
+  classificationNames(ids: readonly number[], layerId: number): { id: number; name: string }[] {
+    const layer = this.layers.find(layer => layer.id === layerId);
+    if (!layer) throw new Error("Choose an existing target layer.");
+    return ids.map((id, index) => ({ id, name: `${layer.name} ${String(layer.nextElementNumber + index).padStart(2, "0")}` }));
   }
 
   unclassify(ids: readonly number[]): void {

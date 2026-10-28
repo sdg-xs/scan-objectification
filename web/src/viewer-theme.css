@@ -75,6 +75,14 @@ kbd, .segments-panel > summary, .segment-tree, .segment-tree .segment-tree { bor
 .segments-panel .segment-name:hover, .segments-panel .segment-name:focus { border-color: #b9c5d3; }
 .segment-row:has(> input:checked), .segment-tree > summary.segment-container-selected,
 .segment-layer-row.segment-container-selected { background: var(--accent-soft); }
+.segment-tree > summary.segment-active-layer, .segment-tree > summary.segment-active-group,
+.segment-object-row:has(> input:checked), .segments-panel .target-layer-option[aria-selected="true"] { background: var(--accent-soft); }
+.segment-active-layer > .segment-name, .segment-active-group > .segment-name { color: var(--accent); font-weight: 600; }
+.segment-object-row[data-classified="true"] .segment-mesh-icon { color: var(--accent); }
+.segments-panel .segment-classification-footer .segment-operations button:first-child { color: #fff; background: var(--accent); border-color: var(--accent); }
+.segments-panel .segment-classification-footer .segment-operations button:first-child:hover:not(:disabled) { background: var(--accent-hover); }
+.segment-classification-footer button:disabled { opacity: .45; }
+#segment-name-error, #segment-create-error { color: #a53e36; }
 .segment-delete-actions button[type="submit"] { background: #a53e36; border-color: #a53e36; color: #fff; }
 .segment-delete-actions button[type="submit"]:hover { background: #8f342d; }
 #empty-state h2 { color: #e3e8ef; }

@@ -1,0 +1,11 @@
+# Target layer and named classification
+
+Continue the user's pending ReCap-style workflow. Put Target Layer at the bottom of Model Browser, below the scrolling list, followed by Classify and Unclassify. The selector opens upward and offers layers organized by group. Its chosen layer is the same state as the inline active-layer marker. Choosing either reveals/highlights that layer and its parent group while retaining an independent container selection for deletion.
+
+Restore selectable object rows below Unclassified and each layer. Classified objects have a distinct mesh icon, name and visibility toggle. SAM-accepted instances start selected in Unclassified. Classify opens a naming dialog with one editable name for each selected object. Following the user's subsequent clarification, defaults use `Layer Name 01`, `Layer Name 02`, etc., from an independent running sequence per layer. Confirm assigns and names them atomically under the captured target layer and advances its counter; cancel/invalid names consume no numbers. Unclassify returns checked objects to Unclassified and retains their names/IDs. These are source splat sets, not newly reconstructed triangle meshes. Keep per-source membership, exclusive ownership and session-only storage.
+
+Use a small target-picker module for drop-up rendering, outside-click dismissal and keyboard behavior. A native top-layer popover escapes ancestor overflow; measure its placement and available height above the trigger. Keep the existing collection responsible for validated membership/name changes. Close pending naming on source replacement or a new segmentation result. Missing target/objects or invalid names must leave the model unchanged. No dependency changes or cloud work.
+
+The user additionally requested direct viewer startup. Complete the existing web/index.html immediate redirect by removing its residual hyperlink, and extend the existing entrypoint test to prove both redirect and no link screen. Preserve unrelated workspace files.
+
+Execution: first capture failing picker/controller/model tests; implement the selector and active highlighting; add named classification and object rows; run all gates and independent review. Preserve unrelated workspace changes. Real-browser visual verification remains subject to the existing local-origin denial.

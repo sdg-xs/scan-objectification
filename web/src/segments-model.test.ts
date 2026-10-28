@@ -16,6 +16,48 @@ it("keeps SAM instances unclassified until explicitly moved to a target layer", 
   expect(scene.segments[1]!.layerId).toBeNull();
 });
 
+it("names and classifies selected objects atomically without changing their source IDs", () => {
+  const scene = new SegmentCollection();
+  scene.reset(3);
+  scene.add(new Uint8Array([1, 2, 0]), "light");
+  const layer = scene.createLayer("Lighting");
+  const [a, b] = scene.segments;
+  scene.classifyNamed([{ id: a!.id, name: "Linear light" }, { id: b!.id, name: "Bulb" }], layer.id);
+  expect(scene.segments.map(item => [item.name, item.layerId, [...item.indices]])).toEqual([
+    ["Linear light", layer.id, [0]], ["Bulb", layer.id, [1]],
+  ]);
+  scene.unclassify([a!.id]);
+  expect(a!.name).toBe("Linear light");
+  expect(a!.layerId).toBeNull();
+});
+
+it("suggests a separate running Layer Name ## sequence and consumes numbers only on confirmation", () => {
+  const scene = new SegmentCollection();
+  scene.reset(3);
+  scene.add(new Uint8Array([1, 2, 3]), "light");
+  const a = scene.createLayer("Lighting");
+  const b = scene.createLayer("Furniture");
+  const ids = scene.segments.map(item => item.id);
+  const names = scene.classificationNames(ids.slice(0, 2), a.id);
+  expect(names.map(item => item.name)).toEqual(["Lighting 01", "Lighting 02"]);
+  expect(scene.classificationNames(ids.slice(0, 2), a.id)).toEqual(names);
+  scene.classifyNamed(names, a.id);
+  expect(scene.classificationNames(ids.slice(2), a.id)[0]!.name).toBe("Lighting 03");
+  expect(scene.classificationNames(ids.slice(2), b.id)[0]!.name).toBe("Furniture 01");
+});
+
+it("rejects incomplete naming and stale classification targets without partial changes", () => {
+  const scene = new SegmentCollection();
+  scene.reset(2);
+  scene.add(new Uint8Array([1, 2]), "light");
+  const layer = scene.createLayer("Lighting");
+  const [a, b] = scene.segments;
+  expect(() => scene.classifyNamed([{ id: a!.id, name: "Good" }, { id: b!.id, name: " " }], layer.id)).toThrow();
+  expect(() => scene.classifyNamed([{ id: a!.id, name: "Good" }, { id: 999, name: "Stale" }], layer.id)).toThrow();
+  expect(() => scene.classifyNamed([{ id: a!.id, name: "Good" }], 999)).toThrow();
+  expect(scene.segments.map(item => [item.name, item.layerId])).toEqual([["light 1", null], ["light 2", null]]);
+});
+
 it("preserves prepared groups and layers when attaching the first source", () => {
   const scene = new SegmentCollection();
   const group = scene.createGroup("MEP");

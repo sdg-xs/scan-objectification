@@ -34,8 +34,8 @@ When open, the panel extends down toward the footer even with an empty list. Its
 Controls use compact icons with delayed hover tooltips and accessible labels. Below Filter, the list starts with **Unclassified**, then **Root**, containing groups and layers. The symbols follow the user's open ReCap Model Browser: four shapes for Unclassified, checked shapes for Root, stacked sheets for groups, and a slanted surface for layers.
 
 1. Use the toolbar to **Add Group** or **Add Layer**, even before loading a scan. Select a group first to create a layer inside it, or choose a group in the creation dialog. Creation clears the filter and expands the item's parent so the result is visible. A hierarchy prepared before the first scan is retained when it loads; replacing a loaded scan resets it.
-2. Groups have an eye toggle. Each layer row has a color swatch, **Set active layer** marker and eye toggle, in that order after its name. Choosing the active layer does not move any objects.
-3. Use SAM's **Add & select checked matches** to segment/select objects; they remain in Unclassified. Assigning selected meshes to the active layer is deferred. Object rows, Target Layer, Classify/Unclassify and selection operations are currently hidden from this list; underlying model functionality is retained.
+2. Groups have an eye toggle. Each layer row has a color swatch, **Set active layer** marker and eye toggle, in that order after its name. The **Target Layer** selector at the bottom opens upward and offers the same layers organized by group. Choosing either control synchronizes the target and highlights/reveals its layer and parent group without moving objects.
+3. Use SAM's **Add & select checked matches** to segment/select objects in Unclassified. Choose Target Layer, then **Classify** at the bottom. The naming dialog proposes `Layer Name 01`, `Layer Name 02`, and so on, with an independent running sequence per layer. Edit names if needed and confirm. Elements appear under **Root → Group → Layer → Element** with a classified-mesh icon. Cancel leaves names and membership unchanged and consumes no sequence numbers. Check element rows and use **Unclassify** to return them to Unclassified while preserving names.
 4. Use Root, group and layer eyes to control classified visibility. Unsegmented splats follow Unclassified visibility; their separate context toggle is retained but hidden. The toolbar contains Add Group, Add Layer, Delete and, at the end, the original/classification color toggle.
 
 Rename layers and groups inline. Click or focus a group/layer row to select it, then use the toolbar Delete icon. Its confirmation offers to unassign contained objects to Unclassified or assign them to another surviving layer. Deleting a group also removes its layers; the dialog states this before confirmation. Cancel leaves everything unchanged. Each splat belongs to one object, and new segmentation takes ownership where results overlap. Records last for the loaded scan and follow alignment changes; reloading or replacing it clears them. Source files and Gaussian properties are unchanged. Saving/exporting classifications is future work. The previous manual asset controls are temporarily hidden; SAM occupies sidebar slot **02**.
@@ -50,12 +50,14 @@ Start the Python API alongside Vite, or use the production viewer below. The loc
 
 1. Load a Gaussian PLY and aim at the elements you need. Hide BIM if it obscures the scan; the capture includes visible layers and respects the active section box.
 2. Click **Open SAM workspace** to open the floating window on the right. Its context field is focused immediately. Enter a visual description such as `rectangular air vent`, `red pipe` or `ceiling light`. You can orbit, pan and zoom with the window open, then click **Capture & detect current view** below the field. SAM matches visible appearance; the field is not a conversational instruction box. Descriptions are limited to 240 characters.
-3. Review the frozen image and numbered matches. Uncheck unwanted matches and click **Add & select checked matches**. Each match becomes a separate selected object in Unclassified. Layer assignment is deferred while the Model Browser list is refined.
+3. Review the frozen image and numbered matches. Uncheck unwanted matches and click **Add & select checked matches**. Each match becomes a separate selected object in Unclassified. Choose Target Layer at the bottom of Model Browser, click Classify, and confirm or edit the numbered default names.
 4. Adjust the live view and capture again to repeat. Each click captures a fresh frame; it does not run continuously as the camera moves. Selection uses the camera and section box saved with that capture. Changed scan placement or a changed selection requires a fresh capture. Applying checked matches closes the window.
 
 Inference runs on this PC using the actual SAM 3.1 checkpoint. The API on port 8767 automatically starts its worker on loopback port 8768; port 8766 is unchanged. The worker reuses the loaded model between requests, clears image-specific state each time, and releases the model after **120 seconds of inactivity**, on failure or on graceful shutdown. The first request after release still needs a cold load. No external image service or browser credentials are used. Captures are limited to 1600 pixels on the longest edge and 50 detections per prompt. Closing the dialog cancels the browser's wait; an already running inference may finish before another request can begin.
 
 The viewer stays live while you type context and review results. During capture/inference and mask projection, its animation loop pauses to reduce GPU contention. Capture renders the requested frame explicitly; completion, failure or closing restores the live view. The window reports loading, frame preparation, detection and result preparation, then shows measured stage durations and whether the model was reused. These are phase indicators, not an ETA. Splat-projection time appears in the sidebar after applying results.
+
+Opening the application root redirects immediately to the “Model meets reality” BIM/Gaussian viewer. The intermediate hyperlink screen is removed.
 
 Cloud processing is planned for later. The browser continues to use only the app's same-origin API for inference and status; a future cloud transport and its credentials belong behind that API. This change does not send captures to a cloud service.
 
@@ -85,7 +87,7 @@ npm.cmd run build
 .\.venv\Scripts\python.exe -m nemy_web.app
 ```
 
-Open http://127.0.0.1:8767/viewer.html. The existing project shell remains at `/`; port 8766 remains reserved for SAM3.
+Open http://127.0.0.1:8767/ to go directly to the viewer, or use `/viewer.html`. Port 8766 remains reserved for SAM3.
 
 ## Limits and verification
 

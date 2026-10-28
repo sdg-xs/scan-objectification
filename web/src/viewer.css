@@ -605,6 +605,23 @@ kbd {
 .segment-unclassified { padding-left: 9px; border-bottom: 1px solid var(--line); }
 #segment-list > .segment-tree { border-top: 0; }
 .segment-layer-row.segment-container-selected { box-shadow: inset 2px 0 var(--accent); }
+.segment-classification-footer { flex-shrink: 0; padding-top: 12px; }
+.target-layer-picker { position: relative; }
+.segment-target-caption { display: block; margin-bottom: 6px; font-size: 10px; color: var(--muted); }
+.segments-panel #segment-target { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; text-align: left; }
+#segment-target-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.target-layer-options { position: fixed; inset: auto; margin: 0; overflow: auto; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); box-shadow: 0 8px 24px #0003; }
+.target-layer-group { padding: 6px 8px 3px; color: var(--muted); font-size: 10px; font-weight: 600; }
+.segments-panel .target-layer-option { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; text-align: left; border-color: transparent; }
+.target-layer-swatch { flex-shrink: 0; width: 12px; height: 12px; border: 1px solid #0003; border-radius: 2px; }
+.target-layer-option > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.segment-classification-footer .segment-operations { margin-top: 10px; gap: 8px; }
+.segment-classification-footer .segment-operations button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto; height: auto; flex: 1; padding: 8px; }
+.segment-object-row { display: flex; align-items: center; gap: 6px; margin-left: 18px; padding: 3px 0 3px 8px; }
+.segment-object-row > input[type="checkbox"], .segment-mesh-icon { flex-shrink: 0; }
+.segment-object-row .segment-mesh-icon { width: 16px; height: 16px; }
+#segment-classify-names { max-height: 50dvh; overflow: auto; }
+#segment-classify-names label { display: grid; gap: 6px; margin-bottom: 12px; }
 @container (max-width: 760px) {
   .segments-panel[open] { top: 16px; bottom: 230px; }
   .segments-panel[open] .segments-body { overflow: auto; }
