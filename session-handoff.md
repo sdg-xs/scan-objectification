@@ -1,3 +1,13 @@
+## Guard IFC input axes for Z-only asset placement — 2026-10-28
+
+User reported an assigned light also appears rotated around Y and requested Playwright inspection. Both browser connection inventory and Playwright CLI showed no connected browser; retry against the supplied localhost:5173 URL exposed only an empty MCP Apps browser. No screenshot or visual inspection of the prepared scene occurred. Do not claim the exact current instance state was observed.
+
+Inspected actual Linear-Light:600mm geometry through the existing read-only gateway and shared IFC extractor. With proper Y→Z conversion its dominant length axis is horizontal; treating those raw IFC coordinates as Already Z-up leaves the length axis pitched ~25.48°. One intrinsic component has a 5° design tilt, which is preserved. The instance object itself already applies rotation(0,0,Z). This establishes an unsafe override path, not proof of which option the user selected or of every possible parent-transform issue.
+
+Catalog summaries now report geometryKind. The picker locks IFC axes to automatic Y→Z conversion before cache lookup. Loaded IFC descriptors enforce their authoritative up axis even with older/unknown catalog metadata, so a changed/disabled UI value cannot skip conversion. Saved mesh geometry retains its meaningful source-axis override. Input hint clarifies IFC automatic handling. This matches the user's updated library: preview/camera changed to Z-up, stored geometry still Y-up; no external library files edited.
+
+TDD RED reproduced the unlocked IFC selector, then GREEN verifies both known IFC and older-catalog cases, authoritative stored sourceUp and zero instance X/Y rotation. Full gate: 99 frontend + 76 backend tests, typecheck/build pass. Independent review found no important issues in cache paths, source enforcement and stale guards. Actual user-scene visual verification remains pending a connected browser. Unrelated build-check.log preserved.
+
 ## Fix first asset assignment restarting the development viewer — 2026-10-28
 
 User reported whole-layer Linear-Light assignment immediately restarted the viewer and confirmed URL localhost:5173/viewer.html. API and library stayed running; the actual requested Linear-Light:600mm (asset 883f1f94-3897-4877-b36e-9edc79f1ddd6) resolves through 123 MB BS19.ifc to only 4 mesh parts/540 triangles. A standalone native extraction succeeded. Memory pressure was an early hypothesis, not an established crash cause; no backend extraction rewrite was made.

@@ -17,7 +17,7 @@ def test_catalog_and_mesh_resolution(library_client):
     client, _, _ = library_client
     result = client.get("/api/local/assets")
     assert result.status_code == 200
-    assert result.json() == [{"id": "asset-1", "name": "Linear light", "category": "Lighting"}]
+    assert result.json() == [{"id": "asset-1", "name": "Linear light", "category": "Lighting", "geometryKind": "mesh"}]
     assert client.get("/api/local/assets/asset-1/geometry").json() == {"kind": "mesh", "geometry": {"meshes": []}}
     assert client.get("/api/local/assets/missing/geometry").status_code == 404
 
@@ -25,6 +25,7 @@ def test_ifc_resolution_and_revision_guard(library_client):
     client, payloads, entry = library_client
     entry["geometryReference"] = {"modelId": "model-1", "fingerprint": "version-1", "occurrenceId": 7}
     payloads["/api/models"] = [{"id": "model-1", "fingerprint": "version-1"}]
+    assert client.get("/api/local/assets").json()[0]["geometryKind"] == "ifc"
     assert client.get("/api/local/assets/asset-1/geometry").json() == {"kind": "ifc", "modelId": "model-1", "occurrenceId": 7, "fingerprint": "version-1"}
     payloads["/api/models"][0]["fingerprint"] = "version-2"
     assert client.get("/api/local/assets/asset-1/geometry").status_code == 409

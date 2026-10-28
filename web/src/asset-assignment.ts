@@ -101,6 +101,10 @@ export class AssetAssignmentControls {
   private buttons(): void {
     for (const id of ["asset-library-choice", "asset-library-filter", "asset-library-category", "asset-source-up", "asset-unit-scale", "asset-rotation-correction"])
       control<HTMLInputElement | HTMLSelectElement>(id).disabled = this.busy;
+    const sourceUp = control<HTMLSelectElement>("asset-source-up");
+    const ifc = this.catalog.find(asset => asset.id === this.choice.value)?.geometryKind === "ifc";
+    if (ifc) sourceUp.value = "y";
+    sourceUp.disabled = this.busy || ifc;
     this.apply.disabled = this.busy || !this.choice.value || !this.scope.length || this.scope.some(({ segment }) => !segment.pose);
     this.correct.disabled = this.busy || !this.scope.some(({ segment }) => segment.asset);
     control<HTMLButtonElement>("asset-library-retry").disabled = this.busy;
@@ -109,7 +113,7 @@ export class AssetAssignmentControls {
     try { this.validateScope(); } catch (error) { this.error(error); return; }
     const asset = this.catalog.find(row => row.id === this.choice.value);
     if (!asset) return;
-    const sourceUp = control<HTMLSelectElement>("asset-source-up").value === "z" ? "z" : "y";
+    let sourceUp: "y" | "z" = asset.geometryKind === "ifc" ? "y" : control<HTMLSelectElement>("asset-source-up").value === "z" ? "z" : "y";
     const scale = Number(control<HTMLSelectElement>("asset-unit-scale").value);
     let correctionZ: number;
     try { correctionZ = this.angle(); if (![1, 0.001, 0.01].includes(scale)) throw new Error("Choose an asset unit scale."); } catch (error) { this.error(error); return; }
@@ -119,6 +123,8 @@ export class AssetAssignmentControls {
       if (!this.placed.has(asset.id, sourceUp)) {
         const loaded = await loadAssetGeometry(asset.id, request.signal);
         request.signal.throwIfAborted(); this.validateScope();
+        asset.geometryKind = loaded.kind;
+        if (loaded.kind === "ifc") sourceUp = loaded.up;
         this.placed.cache(asset.id, normalizedAsset(loaded.geometry, sourceUp), sourceUp);
       }
       request.signal.throwIfAborted(); this.validateScope();

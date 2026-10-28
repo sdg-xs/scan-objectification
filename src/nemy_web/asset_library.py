@@ -91,7 +91,14 @@ async def list_assets(request: Request):
     def read():
         state = catalog()
         categories = {c["id"]: c["name"] for c in state.get("categories", [])}
-        return [{"id": e["id"], "name": e["definition"]["name"], "category": categories.get(e["definition"].get("categoryId"), "Uncategorized")} for e in state["entries"] if e.get("status") != "archived"]
+        result = []
+        for entry in state["entries"]:
+            if entry.get("status") == "archived":
+                continue
+            ref = entry.get("geometryReference") or {}
+            kind = "mesh" if ref.get("kind") == "mesh" else "ifc" if ref.get("modelId") or entry.get("sourceReferences") else None
+            result.append({"id": entry["id"], "name": entry["definition"]["name"], "category": categories.get(entry["definition"].get("categoryId"), "Uncategorized"), "geometryKind": kind})
+        return result
     return await run_in_threadpool(read)
 
 

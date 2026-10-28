@@ -1,3 +1,4 @@
+import * as libraryClient from "./asset-library-client";
 import { Group } from "three";
 import { AssetAssignmentControls } from "./asset-assignment";
 import { PlacedAssets } from "./placed-assets";
@@ -652,4 +653,26 @@ it("discards a geometry response arriving after its source scope is cleared", as
   expect(rows[0]!.asset).toBeUndefined();
   expect(parent.children).toHaveLength(0);
   controls.dispose(); app.panel.dispose();
+});
+
+it.each(["ifc", undefined] as const)("locks IFC source axes with catalog kind %s so Z-only placement cannot inherit a skipped conversion", async geometryKind => {
+  const app = workspace(), parent = new Group(), placed = new PlacedAssets(parent, []);
+  const row: Segment = { id: 1, name: "Light", layerId: 1, indices: new Uint32Array([0]), visible: true,
+    pose: { position: [0,0,0], z: Math.PI / 3, rotationReliable: true } };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([{ id: "ifc-light", name: "Linear", category: "Lighting", geometryKind }]))));
+  const controls = new AssetAssignmentControls(placed, () => controls.sync([row], () => true));
+  controls.sync([row], () => true);
+  await controls.open([row]);
+  expect(app.get("asset-source-up").disabled).toBe(geometryKind === "ifc");
+  expect(app.get("asset-source-up").value).toBe("y");
+  app.get("asset-source-up").value = "z";
+  const loader = vi.spyOn(libraryClient, "loadAssetGeometry").mockResolvedValue({ geometry: { meshes: [{ positions: [0,0,0, 4,0,0, 4,2,0, 0,2,0], normals: Array(12).fill(0), indices: [0,1,2,0,2,3], transform: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1], color: [1,1,1,1] }] }, up: "y", kind: "ifc" });
+  app.get("asset-unit-scale").value = "1";
+  app.get("asset-assignment-apply").fire("click");
+  await vi.waitFor(() => expect(row.asset).toBeDefined());
+  expect(row.asset!.sourceUp).toBe("y");
+  expect(parent.children[0]!.rotation.x).toBe(0);
+  expect(parent.children[0]!.rotation.y).toBe(0);
+  expect(parent.children[0]!.rotation.z).toBeCloseTo(Math.PI / 3);
+  loader.mockRestore(); controls.dispose(); app.panel.dispose();
 });
