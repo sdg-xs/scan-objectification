@@ -119,17 +119,17 @@ it("leaves the view live when context is empty", () => {
   app.controller.dispose();
 });
 
-it("projects actual PNG pixels even when image-element intrinsic dimensions differ", async () => {
+it("preserves inherited canvas dimensions through detection and mask projection", async () => {
   const app = workspace();
   const select = vi.fn(async () => {});
   const close = vi.fn();
   const png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAAAAADRSSBWAAAAC0lEQVR4nGP4zwAAAgEBADK6K5IAAAAASUVORK5CYII=";
-  app.capture.mockReturnValue({ canvas: { width: 2, height: 1, toBlob: callback => callback(new Blob(["frame"])) }, select });
-  vi.stubGlobal("Image", class {
-    naturalWidth = 1;
-    naturalHeight = 1;
-    decode = async () => {};
-  });
+  class CanvasFrame {
+    get width(): number { return 2; }
+    get height(): number { return 1; }
+    toBlob(callback: BlobCallback): void { callback(new Blob(["frame"])); }
+  }
+  app.capture.mockReturnValue({ canvas: new CanvasFrame(), select });
   vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 2, height: 1, close })));
   vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith("sam-status")
     ? { model: "sam3.1", status: "ready", phase: "idle", busy: false, model_loaded: true }

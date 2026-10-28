@@ -75,5 +75,6 @@ export function parseLightResult(value: unknown, frame: { width: number; height:
       throw new Error("SAM 3.1 did not return selection masks. Restart the updated local worker.");
     return { kind, detections };
   });
-  return { model: "sam3.1", ...frame, groups, overlay_png: value.overlay_png, ...(prompt ? { prompt } : {}), ...(value.timings !== undefined ? { timings: parseTimings(value.timings) } : {}) };
+  // Canvas dimensions are inherited accessors, so object spread would omit them.
+  return { model: "sam3.1", width: frame.width, height: frame.height, groups, overlay_png: value.overlay_png, ...(prompt ? { prompt } : {}), ...(value.timings !== undefined ? { timings: parseTimings(value.timings) } : {}) };
 }

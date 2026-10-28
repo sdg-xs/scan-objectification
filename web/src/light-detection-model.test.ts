@@ -7,6 +7,17 @@ const result = () => ({ model: "sam3.1", width: 1, height: 1, overlay_png: png, 
   return { kind, detections };
 }) });
 
+it("preserves capture dimensions inherited from a browser canvas prototype", () => {
+  class CanvasFrame {
+    get width(): number { return 1600; }
+    get height(): number { return 721; }
+  }
+  const frame = new CanvasFrame();
+  expect(Object.keys(frame)).toEqual([]);
+  const parsed = parseLightResult({ ...result(), width: 1600, height: 721 }, frame);
+  expect([parsed.width, parsed.height]).toEqual([1600, 721]);
+});
+
 it("accepts warm-model timing data and rejects invalid durations", () => {
   const timings = { reused_model: true, model_load_ms: 0, image_setup_ms: 1, detection_ms: 2, other_ms: 1, total_ms: 4 };
   expect(parseLightResult({ ...result(), timings }, { width: 1, height: 1 }).timings).toEqual(timings);

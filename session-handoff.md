@@ -1,5 +1,11 @@
 # Session Handoff: USD Gaussian Splat Web Segmentation
 
+## Confirmed capture-dimension loss — 2026-10-28
+
+User supplied the diagnostic: mask 1600×721, capture undefined×undefined. This identifies the actual cause that the earlier decoder change did not address: `parseLightResult` returned `{ ...frame }` with a real HTMLCanvasElement. Canvas width/height are prototype accessors, omitted by object spread even though TypeScript treats the return as LightResult. Replaced spread with explicit width/height reads and documented why. Kept the validated raw bitmap decoder and independent Target Layer window unchanged.
+
+New parser regression uses inherited 1600×721 getters and reproduced undefined dimensions before the fix. Updated the controller capture fixture to prototype getters instead of a plain object; it also reproduced the blocked selection before the fix and now projects the expected label pixels. This corrects the earlier test fixture blind spot. Independent review confirmed the fix with no findings. Full gate: 71 backend tests, 76 frontend tests, typecheck and build pass, with existing optional WebGPU/bundle warnings. Unrelated build-check.log preserved.
+
 ## Selection-mask decoder and independent Target Layer window — 2026-10-28
 
 User reported “The selection mask does not match this view.” That message came from comparing HTMLImageElement.naturalWidth/naturalHeight against the capture during mask application. The API already validates each PNG's IHDR dimensions against the capture. Reproduced the rejection in a controller test where HTML image intrinsic dimensions differ from a valid 2×1 PNG; this is a synthetic reproduction, not proof of the exact cause in the denied user browser. New `selection-mask.ts` validates the PNG header/frame, decodes directly with createImageBitmap (no orientation/color conversion/premultiplication), checks bitmap pixel dimensions, reads an unscaled canvas mask and always closes the bitmap. Genuine mismatches still reject with actual/expected dimensions; no stretching fallback was added. Instance labels and stale/abort guards remain unchanged.
