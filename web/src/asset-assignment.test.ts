@@ -83,6 +83,7 @@ it("previews geometry without assigning and assigns the previewed asset from the
   await vi.waitFor(() => expect(showAssetPreview).toHaveBeenCalled());
   expect(get<HTMLDialogElement>("asset-preview-dialog").open).toBe(true);
   expect(get("asset-preview-title").textContent).toBe("Chair");
+  expect(get("asset-preview-assign").textContent).toBe("Import asset");
   expect(rows.every(row => !row.asset)).toBe(true);
   await click(get("asset-preview-assign"));
   expect(get<HTMLDialogElement>("asset-preview-dialog").open).toBe(false);
@@ -128,6 +129,7 @@ it("cancels closed previews and ignores geometry that arrives afterwards", async
     ? await new Promise<Response>(resolve => { respond = resolve; }) : new Response(JSON.stringify(catalog))));
   await act(() => controls.open(rows)); await click(named("Preview Chair"));
   expect(respond).toBeDefined();
+  expect(get<HTMLButtonElement>("asset-preview-assign").disabled).toBe(true);
   await click(get("asset-preview-close"));
   await act(async () => respond!(new Response(JSON.stringify({ kind: "mesh", geometry }))));
   expect(showAssetPreview).not.toHaveBeenCalled();

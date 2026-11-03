@@ -1,6 +1,6 @@
 # Detect lights in the current viewer
 
-The user requests SAM 3.1 inside the existing local web app, capturing the current view itself instead of requiring screenshots outside the app. The user accepts reloading and realigning the view. This extends the viewer milestone; it does not implement the parked USD upload plan.
+The user requests SAM 3.1 inside the existing local web app, capturing the current view itself instead of requiring screenshots outside the app. The user accepts reloading and realigning the view. This extends the existing Three.js viewer workflow.
 
 Add **Find lights in this view** beside the asset tools. With a Gaussian scan loaded, clicking it renders the current visible scene without the section-box gizmo and copies the WebGL frame synchronously into a PNG at the same aspect ratio, at most 1600 pixels per side. The capture reflects visible layers and section cuts. A modal shows that frozen view while inference runs, then an annotated image and separate counts for linear fixtures, round ceiling lights, and visible bulbs. Categories may overlap. Closing the modal cancels waiting and ignores stale results. No 3D selection or extraction is claimed.
 

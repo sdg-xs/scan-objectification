@@ -17,6 +17,8 @@ The viewer uses **Z up**, with the ground grid in the XY plane. Imported IFC geo
 
 Drag to orbit, right-drag to pan, and scroll to zoom. **Fit all** or **F** frames visible layers. Each layer has a visibility checkbox and its own frame button.
 
+The main viewport and asset geometry preview show an orientation gizmo at the top right: X is red, Y green and Z blue. It follows the camera and does not change geometry orientation or appear in SAM captures. In the geometry preview, **Import asset** assigns the previewed definition to the selected elements. The button becomes available after the preview loads, and stays visible at the bottom while scrolling.
+
 Layers start centered independently. Adjust the scan up axis, translation, rotation and uniform scale, then click **Apply**. **Reset** restores centered placement. Alignment is not saved; refreshing requires selecting the files again.
 
 ## Interactive section box
@@ -41,7 +43,7 @@ Controls use compact icons with delayed hover tooltips and accessible labels. Be
 
 To remove element records, select rows with click/Ctrl/Shift, then use the toolbar **Delete** icon and confirm. This removes the selected entries and classification while preserving all source geometry; their splats return to the unsegmented context and follow Unclassified visibility. Click a group/layer heading to target its container for deletion instead.
 
-Rename layers and groups inline. Click or focus a group/layer row to select it, then use the toolbar Delete icon. Its confirmation offers to unassign contained objects to Unclassified or assign them to another surviving layer. Deleting a group also removes its layers; the dialog states this before confirmation. Cancel leaves everything unchanged. Each splat belongs to one object, and new segmentation takes ownership where results overlap. Records last for the loaded scan and follow alignment changes; reloading or replacing it clears them. Source files and Gaussian properties are unchanged. Saving/exporting classifications is future work. The previous manual asset controls are temporarily hidden; SAM occupies sidebar slot **02**.
+Rename layers and groups inline. Click or focus a group/layer row to select it, then use the toolbar Delete icon. Its confirmation offers to unassign contained objects to Unclassified or assign them to another surviving layer. Deleting a group also removes its layers; the dialog states this before confirmation. Cancel leaves everything unchanged. Each splat belongs to one object, and new segmentation takes ownership where results overlap. Records last for the loaded scan and follow alignment changes; reloading or replacing it clears them. Source files and Gaussian properties are unchanged. The planned deliverable is a separate IFC containing assigned assets at their scan-identified locations; see the [UI/UX plan](docs/superpowers/plans/2026-10-28-threejs-viewer-ui-ux.md). The previous manual asset controls are temporarily hidden; SAM occupies sidebar slot **02**.
 
 ### Assign library assets to segmented elements
 
@@ -53,7 +55,9 @@ After SAM adds elements, the viewer records each selection’s bounding center a
 4. Choose **Assign asset**. Each target gets one occurrence at its own recorded pose. Assignment replaces its prior asset, preserves the original scan, and follows group/layer/element visibility and the section box.
 5. Reopen the element’s Assign asset window, enter **Z rotation correction**, and choose **Update existing asset rotation**. This changes only the asset offset, keeping the detected angle. At layer level, the correction applies to existing assigned assets throughout that layer. Use 180° to reverse a linear asset’s direction.
 
-The read-only gateway uses the existing local library service at `http://127.0.0.1:3001`; it does not modify its catalog. Start its production service with `node.exe dist-server/server/index.js` from the asset.library folder. The assignment window offers Reload library after a connection error. Definitions whose source geometry is unavailable report that error without replacing prior placements. Changing scan/source selection cancels stale loads. Removing an element record removes its assigned occurrence while retaining the original splats; deleting a group/layer preserves assignments on the moved/unclassified elements.
+The read-only gateway uses the existing local library service at `http://127.0.0.1:3001`; it does not modify its catalog. Clicking **Assign asset** automatically starts its built production service if it is stopped, waits up to 30 seconds for readiness, and loads the catalog. Running services are reused; simultaneous requests share one startup. The library stays running when the assignment window or viewer API closes, so its own UI remains usable. The viewer API must be running for automatic startup, just as for SAM.
+
+The default installation is `Desktop/Development/Omniverse/ThatOpenPlatform/asset.library`, relative to the Desktop containing this viewer project. For another location, set the API process environment variable `NEMY_ASSET_LIBRARY_DIR` to the built library folder. Node.js must be on PATH and `dist-server/server/index.js` must exist. Startup diagnostics go to `data/logs/asset-library-service.log`. The assignment window offers **Reload library** after a connection or startup error. Definitions whose source geometry is unavailable report that error without replacing prior placements. Changing scan/source selection cancels stale loads. Removing an element record removes its assigned occurrence while retaining the original splats; deleting a group/layer preserves assignments on the moved/unclassified elements.
 
 Read-only integration smoke check, with both services running:
 
@@ -116,7 +120,7 @@ Open http://127.0.0.1:8767/ to go directly to the viewer, or use `/viewer.html`.
 
 ## Limits and verification
 
-This milestone requires WebGL2 and loads files into browser memory. Server uploads, BIM properties, depth-resolved object extraction, USD import and streamed conversion remain future work. The backend currently supports private project links, rotation and deletion requests; processing and purge workers are not implemented.
+The viewer requires WebGL2 and loads files into browser memory. IFC export with assigned asset instances is planned; segmentation and assignments are currently session-only, and the source IFC and Gaussian scan are not modified. BIM property editing and depth-resolved object reconstruction are not part of the current workflow.
 
 Verified in Chrome with `BS17-IFC.ifc` (24.3 MB) and `BS17-PLY.ply` (325 MB; 4,778,721 splats), including production CSP. This is not a target-PC performance benchmark. Fragments' guarded optional WebGPU code emits build warnings about exports unavailable in the WebGL Three.js entry; the tested viewer uses WebGL.
 

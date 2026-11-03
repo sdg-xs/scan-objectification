@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { LightDetectionControls } from "./light-detection";
+import { LightDetectionControls } from "./sam-element-detection";
 
 // Small DOM boundary fixture: exercise the real controller without a browser dependency.
 class Control extends EventTarget {

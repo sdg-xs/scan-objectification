@@ -1,6 +1,6 @@
 # Local BIM and Gaussian viewer
 
-The first milestone is a browser viewer that opens a local IFC and Gaussian PLY in one Three.js scene. This scope comes from the conversation on 2026-10-26 and supersedes the USD-first implementation order for this milestone only.
+The product is a browser viewer that opens a local IFC and Gaussian PLY in one Three.js scene. This design records the initial viewer milestone; the current product direction continues to build on this viewer.
 
 Use That Open Fragments' IFC importer, Spark for splats, and Three.js OrbitControls. Load files through browser file inputs; do not upload them or expose the test directory through the server. Keep the existing project shell at `/`, and add `/viewer.html`. All workers and WASM are served locally. Add the required IFC dependencies with exact versions; keep every existing dependency pin unchanged.
 

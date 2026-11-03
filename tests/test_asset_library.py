@@ -5,6 +5,7 @@ from nemy_web import asset_library
 
 @pytest.fixture
 def library_client(settings, monkeypatch):
+    monkeypatch.setattr(asset_library, "ensure_running", lambda log_dir: None)
     entry = {"id": "asset-1", "status": "draft", "definition": {"name": "Linear light", "categoryId": "lights"},
              "geometryReference": {"kind": "mesh", "geometryId": "mesh-1"}}
     payloads = {"/api/catalog-library": {"entries": [entry], "categories": [{"id": "lights", "name": "Lighting"}], "sources": []},
@@ -20,6 +21,17 @@ def test_catalog_and_mesh_resolution(library_client):
     assert result.json() == [{"id": "asset-1", "name": "Linear light", "category": "Lighting", "geometryKind": "mesh"}]
     assert client.get("/api/local/assets/asset-1/geometry").json() == {"kind": "mesh", "geometry": {"meshes": []}}
     assert client.get("/api/local/assets/missing/geometry").status_code == 404
+
+
+def test_catalog_request_starts_service_only_for_local_viewer(library_client, monkeypatch):
+    from unittest.mock import Mock
+    client, _, _ = library_client
+    start = Mock()
+    monkeypatch.setattr(asset_library, "ensure_running", start)
+    assert client.get("/api/local/assets", headers={"Origin": "https://example.com"}).status_code == 403
+    start.assert_not_called()
+    assert client.get("/api/local/assets").status_code == 200
+    start.assert_called_once()
 
 def test_ifc_resolution_and_revision_guard(library_client):
     client, payloads, entry = library_client

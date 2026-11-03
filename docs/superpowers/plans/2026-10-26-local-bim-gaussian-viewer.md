@@ -19,4 +19,4 @@ Chrome rendered both actual BS17 sample files in Vite and production FastAPI und
 
 Independent review prompted fixes for IFC replacement coordinate offsets and back/forward caching cleanup. Browser checks also caught and fixed the scale field's step mismatch and malformed-file decoder hangs. Spark receives a local file stream because production CSP blocks fetching a blob URL.
 
-Ruling: the user's viewer-first milestone supersedes the USD implementation order for this scope. Original Tasks 3–7 remain pending. Existing dependency pins remain unchanged; added IFC dependencies and type declarations use exact versions. Files and manual alignment are session-only. No automatic registration or performance acceptance is claimed. Upstream optional WebGPU build warnings are documented in README.
+Ruling: the viewer-first direction is the active product direction. Existing dependency pins remain unchanged; added IFC dependencies and type declarations use exact versions. Files and manual alignment are session-only. No automatic registration or performance acceptance is claimed. Upstream optional WebGPU build warnings are documented in README.

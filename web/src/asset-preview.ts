@@ -2,6 +2,7 @@ import { AmbientLight, Box3, Color, DirectionalLight, PerspectiveCamera, Scene, 
 import type { Group } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { disposeAsset } from "./asset-geometry";
+import { createAxisGizmo } from "./axis-gizmo";
 
 /** Owns the preview geometry and releases it with the temporary rendering surface. */
 export function showAssetPreview(host: HTMLElement, geometry: Group): () => void {
@@ -13,11 +14,13 @@ export function showAssetPreview(host: HTMLElement, geometry: Group): () => void
   const scene = new Scene(); scene.background = new Color("#eef2f3"); scene.add(geometry, new AmbientLight(0xffffff, 2));
   const light = new DirectionalLight(0xffffff, 3); light.position.set(3, -4, 6); scene.add(light);
   const camera = new PerspectiveCamera(40, 1, 0.001, 10000); camera.up.set(0, 0, 1);
+  const axes = createAxisGizmo(camera, renderer);
+  renderer.domElement.setAttribute("aria-label", "Asset preview. Z up; X red, Y green, Z blue. Drag to orbit, scroll to zoom.");
   const bounds = new Box3().setFromObject(geometry), center = bounds.getCenter(new Vector3());
   const radius = Math.max(bounds.getSize(new Vector3()).length() / 2, 0.001);
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.target.copy(center);
-  const render = () => renderer.render(scene, camera);
+  const render = () => { renderer.render(scene, camera); axes.render(); };
   let fitted = false;
   const resize = () => {
     const width = Math.max(host.clientWidth, 1), height = Math.max(host.clientHeight, 1);
@@ -33,5 +36,5 @@ export function showAssetPreview(host: HTMLElement, geometry: Group): () => void
   };
   orbit.addEventListener("change", render);
   const observer = new ResizeObserver(resize); observer.observe(host); resize();
-  return () => { observer.disconnect(); orbit.dispose(); disposeAsset(geometry); renderer.dispose(); renderer.domElement.remove(); };
+  return () => { observer.disconnect(); orbit.dispose(); axes.dispose(); disposeAsset(geometry); renderer.dispose(); renderer.domElement.remove(); };
 }

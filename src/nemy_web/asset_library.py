@@ -11,9 +11,9 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
 from nemy_web.lights import require_local_viewer
+from nemy_web.asset_library_service import LIBRARY_URL, ensure_running
 
 router = APIRouter(prefix="/api/local/assets")
-LIBRARY_URL = "http://127.0.0.1:3001"
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise HTTPException(502, "The asset library redirected the request.")
@@ -89,6 +89,7 @@ def resolve(asset_id: str):
 async def list_assets(request: Request):
     require_local_viewer(request)
     def read():
+        ensure_running(request.app.state.settings.logs_dir)
         state = catalog()
         categories = {c["id"]: c["name"] for c in state.get("categories", [])}
         result = []

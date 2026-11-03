@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { createAxisGizmo } from "./axis-gizmo";
 import { FragmentsModels, IfcImporter } from "@thatopen/fragments";
 import type { FragmentsModel } from "@thatopen/fragments";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
@@ -10,7 +11,7 @@ import { AssetSelection } from "./asset-selection";
 import { SegmentPanel } from "./segments";
 import { PlacedAssets } from "./placed-assets";
 import { AssetAssignmentControls } from "./asset-assignment";
-import { LightDetectionControls } from "./light-detection";
+import { LightDetectionControls } from "./sam-element-detection";
 import { captureSize } from "./light-detection-model";
 import {
   applyScanTransform,
@@ -64,6 +65,7 @@ async function start(): Promise<void> {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 10000);
   camera.up.set(0, 0, 1);
+  const axes = createAxisGizmo(camera, renderer);
   camera.position.set(25, -25, 20);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -193,6 +195,7 @@ async function start(): Promise<void> {
     renderer.clippingPlanes = section.planes;
     renderer.render(scene, camera);
     section.render(renderer);
+    axes.render();
   }
   renderer.setAnimationLoop(renderFrame);
 
@@ -467,6 +470,7 @@ async function start(): Promise<void> {
     segments.dispose();
     lights.dispose();
     controls.dispose();
+    axes.dispose();
     section.dispose();
     splats?.dispose();
     spark.dispose();

@@ -35,7 +35,7 @@ export class AssetAssignmentControls {
     control("asset-preview-dialog").addEventListener("cancel", event => { event.preventDefault(); this.closePreview(); }, { signal });
     control("asset-preview-dialog").addEventListener("keydown", event => { if (event.key === "Escape") event.stopPropagation(); }, { signal });
     control("asset-preview-assign").addEventListener("click", () => {
-      if (!this.previewAsset) return;
+      if (!this.previewAsset || !this.disposePreview) return;
       this.selectedId = this.previewAsset.id;
       this.closePreview(); this.buttons(); void this.assign();
     }, { signal });
@@ -62,7 +62,7 @@ export class AssetAssignmentControls {
   }
   private async readCatalog(): Promise<void> {
     this.request?.abort(); const request = this.request = new AbortController();
-    this.busy = true; this.buttons(); this.status.textContent = "Loading asset library…";
+    this.busy = true; this.buttons(); this.status.textContent = "Connecting to asset library · Starting it if needed…";
     try {
       const catalog = parseCatalog(await libraryJson("/api/local/assets", request.signal));
       if (request.signal.aborted) return;
@@ -83,7 +83,7 @@ export class AssetAssignmentControls {
       onPreview: asset => { void this.preview(asset); },
     }, this.session);
     this.apply.disabled = this.busy || !this.selectedId || !this.scope.length || this.scope.some(({ segment }) => !segment.pose);
-    control<HTMLButtonElement>("asset-preview-assign").disabled = this.busy || !this.previewAsset || this.scope.some(({ segment }) => !segment.pose);
+    control<HTMLButtonElement>("asset-preview-assign").disabled = this.busy || !this.previewAsset || !this.disposePreview || this.scope.some(({ segment }) => !segment.pose);
     control<HTMLButtonElement>("asset-library-retry").disabled = this.busy;
   }
   private async preview(asset: CatalogAsset): Promise<void> {
@@ -98,6 +98,7 @@ export class AssetAssignmentControls {
       ]);
       request.signal.throwIfAborted();
       this.disposePreview = showAssetPreview(control("asset-preview-viewport"), normalizedAsset(geometry, up));
+      this.buttons();
       control("asset-preview-status").textContent = "Drag to orbit · Scroll to zoom";
     } catch (error) { if (!request.signal.aborted) control("asset-preview-status").textContent = error instanceof Error ? error.message : "Preview unavailable."; }
   }

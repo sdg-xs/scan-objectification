@@ -33,5 +33,6 @@ build/
 
 # Local acceptance models and browser verification artifacts.
 /test_files/
-/output/playwright/
+/output/
 /.playwright-cli/
+*.log
